@@ -9,7 +9,6 @@
 </head>
 <body class="bg-gray-100 flex items-center justify-center min-h-screen font-sans p-6">
 
-```
 <div class="bg-white p-8 rounded-xl shadow-lg w-full max-w-lg">
 
     <div class="mb-6">
@@ -27,6 +26,24 @@
             Perbarui informasi surat keluar.
         </p>
 
+        @if ($errors->any())
+
+<div class="bg-red-50 border border-red-200 text-red-700 rounded-lg p-4 mt-4">
+
+    <ul class="list-disc pl-5">
+
+        @foreach($errors->all() as $error)
+
+            <li>{{ $error }}</li>
+
+        @endforeach
+
+    </ul>
+
+</div>
+
+@endif
+
     </div>
 
     <form action="{{ route('surat-keluar.update', $surat_keluar->id) }}"
@@ -43,9 +60,8 @@
             </label>
 
             <input type="text"
-                   name="nomor_surat"
                    value="{{ $surat_keluar->nomor_surat }}"
-                   required
+                   readonly
                    class="w-full px-4 py-2.5 bg-gray-50 border border-gray-300 rounded-lg">
         </div>
 
@@ -113,8 +129,25 @@
                    class="w-full px-4 py-2.5 bg-gray-50 border border-gray-300 rounded-lg">
 
             <p class="text-xs text-gray-500 mt-1">
-                Format: PDF, JPG, PNG (Max 2MB)
+                Format yang didukung: PDF, JPG, PNG, DOCX (Maks. 5MB)
             </p>
+
+            <!-- Info Box Placeholders DOCX -->
+            <div class="mt-4 p-4 bg-blue-50/50 border border-blue-100 rounded-xl text-xs space-y-2 text-slate-600">
+                <h4 class="font-bold text-blue-800 flex items-center gap-1">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 01-2 2h0a2 2 0 01-2 2v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z"></path></svg>
+                    Tips E-Sign Dokumen Word (DOCX):
+                </h4>
+                <p class="leading-relaxed">Jika mengunggah draf berformat Word, Anda dapat menuliskan kode-kode penanda (*placeholders*) berikut di dalam berkas Word Anda. Sistem akan otomatis menggantinya dengan tanda tangan asli dan QR Code saat disetujui Dirut:</p>
+                <ul class="list-disc ml-4 space-y-1">
+                    <li><code class="font-mono bg-white px-1 py-0.5 border border-slate-200 rounded text-blue-600">${nomor_surat}</code> : Nomor surat keluar dinamis yang dibuat sistem.</li>
+                    <li><code class="font-mono bg-white px-1 py-0.5 border border-slate-200 rounded text-blue-600">${ttd_dirut}</code> : Lokasi gambar tanda tangan digital.</li>
+                    <li><code class="font-mono bg-white px-1 py-0.5 border border-slate-200 rounded text-blue-600">${qr_code}</code> : Lokasi QR Code untuk verifikasi keaslian surat.</li>
+                    <li><code class="font-mono bg-white px-1 py-0.5 border border-slate-200 rounded text-blue-600">${nama_dirut}</code> : Nama lengkap penanda tangan (Direktur Utama).</li>
+                    <li><code class="font-mono bg-white px-1 py-0.5 border border-slate-200 rounded text-blue-600">${tanggal_ttd}</code> : Tanggal penyematan E-Sign.</li>
+                    <li><code class="font-mono bg-white px-1 py-0.5 border border-slate-200 rounded text-blue-600">${hash_verify}</code> : Kode enkripsi hash SHA-256 dokumen.</li>
+                </ul>
+            </div>
         </div>
 
         <div>
@@ -160,7 +193,6 @@
     </form>
 
 </div>
-```
 
 </body>
 </html>

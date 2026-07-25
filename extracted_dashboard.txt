@@ -1,0 +1,333 @@
+Created At: 2026-07-19T08:10:33+07:00
+Completed At: 2026-07-19T08:10:34+07:00
+File Path: `file:///c:/xampp/htdocs/example-app/resources/views/dashboard.blade.php`
+Total Lines: 324
+Total Bytes: 20414
+Showing lines 1 to 324
+The following code has been modified to include a line number before every line, in the format: <line_number>: <original_line>. Please note that any changes targeting the original code should remove the line number, colon, and leading space.
+1: <!DOCTYPE html>
+2: <html lang="id">
+3: <head>
+4:     <meta charset="UTF-8">
+5:     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+6:     <title>Dashboard E-Office - PT. Fasadetama Indonesia</title>
+7:     <script src="https://cdn.tailwindcss.com"></script>
+8:     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+9:     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+10:     <style>
+11:         body { font-family: 'Inter', sans-serif; }
+12:         ::-webkit-scrollbar { width: 6px; height: 6px; }
+13:         ::-webkit-scrollbar-track { background: transparent; }
+14:         ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 10px; }
+15:         ::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
+16:     </style>
+17: </head>
+18: <body class="bg-slate-50 text-slate-800">
+19: 
+20: <div class="flex min-h-screen">
+21: 
+22:     @include('layouts.partials.sidebar')
+23: 
+24:     <!-- Main Content Area -->
+25:     <main class="flex-1 p-8 h-screen overflow-y-auto">
+26: 
+27:         @php
+28:         $role = match(auth()->user()->role){
+29:             'dirut' => 'Direktur Utama',
+30:             'direktur1' => 'Direktur Keuangan & Administrasi',
+31:             'direktur2' => 'Direktur Teknik',
+32:             'sekretaris' => 'Sekretaris',
+33:             'staff' => 'Staff',
+34:             default => auth()->user()->role,
+35:         };
+36: 
+37:         $hour = now()->format('H');
+38:         if($hour < 11){
+39:             $greeting = 'Selamat Pagi';
+40:         }elseif($hour < 15){
+41:             $greeting = 'Selamat Siang';
+42:         }elseif($hour < 18){
+43:             $greeting = 'Selamat Sore';
+44:         }else{
+45:             $greeting = 'Selamat Malam';
+46:         }
+47:         @endphp
+48: 
+49:         <div class="bg-gradient-to-br from-blue-700 via-blue-600 to-indigo-800 rounded-2xl p-8 text-white mb-8 shadow-lg shadow-blue-500/20 relative overflow-hidden">
+50:             <div class="absolute top-0 right-0 -mr-16 -mt-16 w-64 h-64 rounded-full bg-white opacity-5 blur-2xl"></div>
+51:             
+52:             <div class="flex justify-between items-center relative z-10">
+53:                 <div>
+54:                     <h1 class="text-3xl lg:text-4xl font-bold mb-2">
+55:                         {{ $greeting }}, {{ auth()->user()->name }} 👋
+56:                     </h1>
+57:                     <div class="flex items-center gap-3 text-blue-100">
+58:                         <span class="bg-white/20 px-3 py-1 rounded-full text-sm font-medium backdrop-blur-sm capitalize">
+59:                             {{ $role }}
+60:                         </span>
+61:                         <span class="text-sm">
+62:                             {{ now()->translatedFormat('l, d F Y') }}
+63:                         </span>
+64:                     </div>
+65:                     <p class="text-blue-50 mt-5 opacity-90">
+66:                         Selamat datang kembali di Sistem Informasi E-Office PT. Fasadetama Indonesia.
+67:                     </p>
+68:                 </div>
+69: 
+70:                 <div class="hidden lg:block">
+71:                     <div class="bg-white/10 backdrop-blur-md border border-white/20 rounded-xl px-6 py-5 shadow-inner">
+72:                         <p class="text-xs text-blue-200 uppercase tracking-wider mb-1">Informasi Akun</p>
+73:                         <h2 class="text-xl font-bold">{{ auth()->user()->name }}</h2>
+74:                         <p class="text-sm text-blue-100">{{ auth()->user()->email }}</p>
+75:                     </div>
+76:                 </div>
+77:             </div>
+78:         </div>
+79: 
+80:         <!-- Sembunyikan Statistik & Daftar Surat Khusus Administrator -->
+81:         @if(!in_array(strtolower(auth()->user()->role), ['admin', 'administrator', 'superadmin']))
+82:             
+83:             <div class="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-6 gap-5 mb-8">
+84:                 <div class="bg-white p-5 rounded-xl shadow-sm border border-slate-100 flex items-center justify-between hover:shadow-md transition-shadow">
+85:                     <div>
+86:                         <p class="text-sm font-medium text-slate-500">Surat Masuk</p>
+87:                         <h2 class="text-2xl font-bold text-slate-800 mt-1">{{ $totalSuratMasuk ?? 0 }}</h2>
+88:                     </div>
+89:                     <div class="w-12 h-12 rounded-full bg-blue-50 text-blue-600 flex items-center justify-center">
+90:                         <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 13V6a2 2 0 00-2-2H6a2 2 0 00-2 2v7m16 0v5a2 2 0 01-2 2H6a2 2 0 01-2-2v-5m16 0h-2.586a1 1 0 00-.707.293l-2.414 2.414a1 1 0 01-.707.293h-3.172a1 1 0 01-.707-.293l-2.414-2.414A1 1 0 006.586 13H4"></path></svg>
+91:                     </div>
+92:                 </div>
+93:                 <div class="bg-white p-5 rounded-xl shadow-sm border border-slate-100 flex items-center justify-between hover:shadow-md transition-shadow">
+94:                     <div>
+95:                         <p class="text-sm font-medium text-slate-500">Surat Keluar</p>
+96:                         <h2 class="text-2xl font-bold text-slate-800 mt-1">{{ $totalSuratKeluar ?? 0 }}</h2>
+97:                     </div>
+98:                     <div class="w-12 h-12 rounded-full bg-green-50 text-green-600 flex items-center justify-center">
+99:                         <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8"></path></svg>
+100:                     </div>
+101:                 </div>
+102:                 <div class="bg-white p-5 rounded-xl shadow-sm border border-slate-100 flex items-center justify-between hover:shadow-md transition-shadow">
+103:                     <div>
+104:                         <p class="text-sm font-medium text-slate-500">Draft</p>
+105:                         <h2 class="text-2xl font-bold text-slate-800 mt-1">{{ $totalDraft ?? 0 }}</h2>
+106:                     </div>
+107:                     <div class="w-12 h-12 rounded-full bg-yellow-50 text-yellow-600 flex items-center justify-center">
+108:                         <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"></path></svg>
+109:                     </div>
+110:                 </div>
+111:                 <div class="bg-white p-5 rounded-xl shadow-sm border border-slate-100 flex items-center justify-between hover:shadow-md transition-shadow">
+112:                     <div>
+113:                         <p class="text-sm font-medium text-slate-500">Dikirim</p>
+114:                         <h2 class="text-2xl font-bold text-slate-800 mt-1">{{ $totalDikirim ?? 0 }}</h2>
+115:                     </div>
+116:                     <div class="w-12 h-12 rounded-full bg-cyan-50 text-cyan-600 flex items-center justify-center">
+117:                         <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8"></path></svg>
+118:                     </div>
+119:                 </div>
+120:                 <div class="bg-white p-5 rounded-xl shadow-sm border border-slate-100 flex items-center justify-between hover:shadow-md transition-shadow">
+121:                     <div>
+122:                         <p class="text-sm font-medium text-slate-500">Selesai</p>
+123:                         <h2 class="text-2xl font-bold text-slate-800 mt-1">{{ $totalSelesai ?? 0 }}</h2>
+124:                     </div>
+125:                     <div class="w-12 h-12 rounded-full bg-emerald-50 text-emerald-600 flex items-center justify-center">
+126:                         <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+127:                     </div>
+128:                 </div>
+129:                 <div class="bg-white p-5 rounded-xl shadow-sm border border-slate-100 flex items-center justify-between hover:shadow-md transition-shadow">
+130:                     <div>
+131:                         <p class="text-sm font-medium text-slate-500">Menunggu</p>
+132:                         <h2 class="text-2xl font-bold text-slate-800 mt-1">{{ $disposisiMenunggu ?? 0 }}</h2>
+133:                     </div>
+134:                     <div class="w-12 h-12 rounded-full bg-orange-50 text-orange-600 flex items-center justify-center">
+135:                         <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+136:                     </div>
+137:                 </div>
+138:             </div>
+139: 
+140:             <div class="grid grid-cols-1 xl:grid-cols-3 gap-6 mb-8">
+141:                 <div class="xl:col-span-2 bg-white rounded-2xl shadow-sm border border-slate-100 p-6 sm:p-8">
+142:                     <div class="flex justify-between items-center mb-6">
+143:                         <div>
+144:                             <h3 class="text-lg font-bold text-slate-800">Statistik Surat</h3>
+145:                             <p class="text-sm text-slate-500 mt-1">Perbandingan volume Surat Masuk dan Surat Keluar per bulan.</p>
+146:                         </div>
+147:                     </div>
+148:                     <div class="relative h-72 w-full">
+149:                         <canvas id="chartSurat"></canvas>
+150:                     </div>
+151:                 </div>
+152: 
+153:                 <div class="bg-white rounded-2xl shadow-sm border border-slate-100 p-6 sm:p-8 flex flex-col">
+154:                     <div class="mb-4">
+155:                         <h3 class="text-lg font-bold text-slate-800">Status Disposisi</h3>
+156:                         <p class="text-sm text-slate-500 mt-1">Distribusi status tugas secara keseluruhan.</p>
+157:                     </div>
+158:                     <div class="relative flex-1 flex items-center justify-center w-full min-h-[250px]">
+159:                         <canvas id="chartDisposisi"></canvas>
+160:                     </div>
+161:                 </div>
+162:             </div>
+163: 
+164:             <div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
+165:                 <div class="bg-white rounded-xl shadow-sm border border-slate-100 overflow-hidden flex flex-col">
+166:                     <div class="p-6 border-b border-slate-100 bg-slate-50/50 flex justify-between items-center">
+167:                         <h3 class="text-lg font-bold text-slate-800">Disposisi Saya</h3>
+168:                         <a href="{{ route('disposisi.saya') }}" class="text-sm text-blue-600 hover:text-blue-700 font-medium">Lihat Semua</a>
+169:                     </div>
+170:                     <div class="flex-1 p-2">
+171:                         @forelse($disposisiSaya ?? [] as $item)
+172:                             <div class="p-4 rounded-lg hover:bg-slate-50 transition-colors border-b border-slate-100 last:border-0 group">
+173:                                 <div class="flex justify-between items-start mb-1">
+174:                                     <div class="font-semibold text-blue-700 group-hover:text-blue-800 transition-colors">
+175:                                         {{ $item->suratMasuk->nomor_surat }}
+176:                                     </div>
+177:                                     <span class="text-[11px] font-bold uppercase tracking-wider px-2.5 py-1 rounded-full bg-orange-100 text-orange-700">
+178:                                         {{ $item->status }}
+179:                                     </span>
+180:                                 </div>
+181:                                 <p class="text-sm text-slate-700 mb-3 line-clamp-1">
+182:                                     {{ $item->suratMasuk->perihal }}
+183:                                 </p>
+184:                                 <div class="flex justify-between items-center text-sm">
+185:                                     <div class="flex items-center gap-1.5 text-slate-500">
+186:                                         <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"></path></svg>
+187:                                         <span>Dari: {{ $item->dariUser->name }}</span>
+188:                                     </div>
+189:                                     <a href="{{ route('disposisi.edit', $item->id) }}"
+190:                                        class="flex items-center gap-1 text-blue-600 hover:text-blue-800 font-medium">
+191:                                         Detail <span aria-hidden="true">&rarr;</span>
+192:                                     </a>
+193:                                 </div>
+194:                             </div>
+195:                         @empty
+196:                             <div class="p-8 text-center text-slate-500 flex flex-col items-center justify-center h-full">
+197:                                 <svg class="w-12 h-12 text-slate-300 mb-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"></path></svg>
+198:                                 <p>Tidak ada disposisi saat ini.</p>
+199:                             </div>
+200:                         @endforelse
+201:                     </div>
+202:                 </div>
+203: 
+204:                 <div class="bg-white rounded-xl shadow-sm border border-slate-100 overflow-hidden flex flex-col">
+205:                     <div class="p-6 border-b border-slate-100 bg-slate-50/50 flex justify-between items-center">
+206:                         <h3 class="text-lg font-bold text-slate-800">Surat Masuk Terbaru</h3>
+207:                         <a href="{{ route('surat-masuk.index') }}" class="text-sm text-blue-600 hover:text-blue-700 font-medium">Lihat Semua</a>
+208:                     </div>
+209:                     <div class="flex-1 p-2">
+210:                         @forelse($suratTerbaru ?? [] as $surat)
+211:                             <div class="p-4 rounded-lg hover:bg-slate-50 transition-colors border-b border-slate-100 last:border-0 group">
+212:                                 <div class="flex justify-between items-start mb-1">
+213:                                     <div class="font-semibold text-slate-800 group-hover:text-blue-700 transition-colors">
+214:                                         {{ $surat->nomor_surat }}
+215:                                     </div>
+216:                                     <div class="text-xs text-slate-500 flex items-center gap-1 bg-slate-100 px-2 py-1 rounded-md">
+217:                                         <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"></path></svg>
+218:                                         {{ $surat->tanggal_surat }}
+219:                                     </div>
+220:                                 </div>
+221:                                 <p class="text-sm text-slate-600 mt-2 line-clamp-2 leading-relaxed">
+222:                                     {{ $surat->perihal }}
+223:                                 </p>
+224:                             </div>
+225:                         @empty
+226:                             <div class="p-8 text-center text-slate-500 flex flex-col items-center justify-center h-full">
+227:                                 <svg class="w-12 h-12 text-slate-300 mb-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 13V6a2 2 0 00-2-2H6a2 2 0 00-2 2v7m16 0v5a2 2 0 01-2 2H6a2 2 0 01-2-2v-5m16 0h-2.586a1 1 0 00-.707.293l-2.414 2.414a1 1 0 01-.707.293h-3.172a1 1 0 01-.707-.293l-2.414-2.414A1 1 0 006.586 13H4"></path></svg>
+228:                                 <p>Belum ada surat masuk.</p>
+229:                             </div>
+230:                         @endforelse
+231:                     </div>
+232:                 </div>
+233: 
+234:             </div>
+235:         @else
+236:             <!-- Tampilan Dashboard Khusus Administrator -->
+237:             <div class="bg-white rounded-2xl shadow-sm border border-slate-100 p-8 text-center">
+238:                 <div class="w-20 h-20 bg-blue-50 text-blue-600 rounded-full flex items-center justify-center mx-auto mb-4">
+239:                     <svg class="w-10 h-10" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4"></path></svg>
+240:                 </div>
+241:                 <h2 class="text-2xl font-bold text-slate-800 mb-2">Pusat Kendali Sistem</h2>
+242:                 <p class="text-slate-500 max-w-xl mx-auto mb-8">Anda login sebagai Administrator. Gunakan menu di sebelah kiri untuk mengelola pengguna atau memantau log aktivitas sistem.</p>
+243:                 
+244:                 <div class="flex justify-center gap-4">
+245:                     <a href="{{ route('users.index') }}" class="px-6 py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-medium transition-colors shadow-sm">Kelola Pengguna</a>
+246:                     <a href="{{ route('activity.index') }}" class="px-6 py-3 bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 rounded-xl font-medium transition-colors shadow-sm">Lihat Log Aktivitas</a>
+247:                 </div>
+248:             </div>
+249:         @endif
+250:     </main>
+251: </div>
+252: 
+253: <!-- Render script chart HANYA jika bukan Administrator (karena admin tidak perlu render grafik persuratan) -->
+254: @if(!in_array(strtolower(auth()->user()->role), ['admin', 'administrator', 'superadmin']))
+255: <script>
+256:     Chart.defaults.font.family = "'Inter', sans-serif";
+257:     Chart.defaults.color = '#64748b'; 
+258: 
+259:     const bulan = ['Jan','Feb','Mar','Apr','Mei','Jun','Jul','Agu','Sep','Okt','Nov','Des'];
+260: 
+261:     new Chart(document.getElementById('chartSurat'), {
+262:         type: 'bar',
+263:         data: {
+264:             labels: bulan,
+265:             datasets: [
+266:                 {
+267:                     label: 'Surat Masuk',
+268:                     data: @json($suratMasukBulanan ?? []),
+269:                     backgroundColor: '#3b82f6', 
+270:                     borderRadius: 4,            
+271:                     borderSkipped: false,
+272:                     barPercentage: 0.6,
+273:                     categoryPercentage: 0.8
+274:                 },
+275:                 {
+276:                     label: 'Surat Keluar',
+277:                     data: @json($suratKeluarBulanan ?? []),
+278:                     backgroundColor: '#10b981', 
+279:                     borderRadius: 4,
+280:                     borderSkipped: false,
+281:                     barPercentage: 0.6,
+282:                     categoryPercentage: 0.8
+283:                 }
+284:             ]
+285:         },
+286:         options: {
+287:             responsive: true,
+288:             maintainAspectRatio: false,
+289:             plugins: {
+290:                 legend: { position: 'top', align: 'end', labels: { usePointStyle: true, boxWidth: 8, padding: 20 } },
+291:                 tooltip: { backgroundColor: '#1e293b', padding: 12, cornerRadius: 8 }
+292:             },
+293:             scales: {
+294:                 y: { grid: { color: '#f1f5f9', drawBorder: false }, border: { display: false } },
+295:                 x: { grid: { display: false, drawBorder: false }, border: { display: false } }
+296:             }
+297:         }
+298:     });
+299: 
+300:     new Chart(document.getElementById('chartDisposisi'), {
+301:         type: 'doughnut',
+302:         data: {
+303:             labels: ['Menunggu', 'Diproses', 'Selesai'],
+304:             datasets: [{
+305:                 data: @json($statusDisposisi ?? []),
+306:                 backgroundColor: ['#facc15', '#3b82f6', '#10b981'],
+307:                 borderWidth: 0,
+308:                 hoverOffset: 4
+309:             }]
+310:         },
+311:         options: {
+312:             responsive: true,
+313:             maintainAspectRatio: false,
+314:             cutout: '75%', 
+315:             plugins: {
+316:                 legend: { position: 'bottom', labels: { usePointStyle: true, boxWidth: 8, padding: 20 } },
+317:                 tooltip: { backgroundColor: '#1e293b', padding: 12, cornerRadius: 8 }
+318:             }
+319:         }
+320:     });
+321: </script>
+322: @endif
+323: </body>
+324: </html>
+The above content shows the entire, complete file contents of the requested file.
+

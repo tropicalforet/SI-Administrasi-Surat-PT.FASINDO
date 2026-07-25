@@ -1,183 +1,171 @@
-<!DOCTYPE html>
+@extends('layouts.app')
 
-<html lang="id">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Tambah SKPD - E-Office</title>
-    <script src="https://cdn.tailwindcss.com"></script>
-</head>
-<body class="bg-gray-100 flex items-center justify-center min-h-screen font-sans p-6">
+@section('content')
+<div class="py-10 px-4 sm:px-6 max-w-3xl mx-auto">
 
-<div class="bg-white p-8 rounded-xl shadow-lg w-full max-w-3xl">
-
-<div class="mb-6">
-
-    <h2 class="text-2xl font-bold text-gray-800">
-        Tambah SKPD
-    </h2>
-
-    <p class="text-gray-500 text-sm mt-1">
-        Surat Keterangan Perjalanan Dinas
-    </p>
-
-</div>
-
-<form action="{{ route('skpd.store') }}"
-      method="POST"
-      enctype="multipart/form-data"
-      class="space-y-5">
-
-    @csrf
-
-    <div>
-        <label class="block text-sm font-medium text-gray-700 mb-2">
-            Nama Pegawai
-        </label>
-
-        <input type="text"
-               name="nama_pegawai"
-               required
-               class="w-full px-4 py-2.5 bg-gray-50 border border-gray-300 rounded-lg">
-    </div>
-
-    <div>
-        <label class="block text-sm font-medium text-gray-700 mb-2">
-            NIP
-        </label>
-
-        <input type="text"
-               name="nip"
-               required
-               class="w-full px-4 py-2.5 bg-gray-50 border border-gray-300 rounded-lg">
-    </div>
-
-    <div>
-        <label class="block text-sm font-medium text-gray-700 mb-2">
-            Tujuan Dinas
-        </label>
-
-        <input type="text"
-               name="tujuan_dinas"
-               required
-               placeholder="Contoh: Bandung"
-               class="w-full px-4 py-2.5 bg-gray-50 border border-gray-300 rounded-lg">
-    </div>
-
-    <div>
-        <label class="block text-sm font-medium text-gray-700 mb-2">
-            Keperluan
-        </label>
-
-        <textarea name="keperluan"
-                  rows="3"
-                  required
-                  class="w-full px-4 py-2.5 bg-gray-50 border border-gray-300 rounded-lg"></textarea>
-    </div>
-
-    <div class="grid grid-cols-2 gap-4">
-
-        <div>
-            <label class="block text-sm font-medium text-gray-700 mb-2">
-                Tanggal Berangkat
-            </label>
-
-            <input type="date"
-                   name="tanggal_berangkat"
-                   required
-                   class="w-full px-4 py-2.5 bg-gray-50 border border-gray-300 rounded-lg">
-        </div>
-
-        <div>
-            <label class="block text-sm font-medium text-gray-700 mb-2">
-                Tanggal Kembali
-            </label>
-
-            <input type="date"
-                   name="tanggal_kembali"
-                   required
-                   class="w-full px-4 py-2.5 bg-gray-50 border border-gray-300 rounded-lg">
-        </div>
-
-    </div>
-
-    <hr>
-
-    <h3 class="font-bold text-lg text-gray-700">
-        Rincian Biaya Perjalanan
-    </h3>
-
-    <div>
-        <label class="block text-sm font-medium text-gray-700 mb-2">
-            Biaya Transport
-        </label>
-
-        <input type="number"
-               name="biaya_transport"
-               required
-               min="0"
-               class="w-full px-4 py-2.5 bg-gray-50 border border-gray-300 rounded-lg">
-    </div>
-
-    <div>
-        <label class="block text-sm font-medium text-gray-700 mb-2">
-            Biaya Penginapan
-        </label>
-
-        <input type="number"
-               name="biaya_penginapan"
-               required
-               min="0"
-               class="w-full px-4 py-2.5 bg-gray-50 border border-gray-300 rounded-lg">
-    </div>
-
-    <div>
-        <label class="block text-sm font-medium text-gray-700 mb-2">
-            Biaya Konsumsi per Hari
-        </label>
-
-        <input type="number"
-               name="biaya_konsumsi_per_hari"
-               required
-               min="0"
-               class="w-full px-4 py-2.5 bg-gray-50 border border-gray-300 rounded-lg">
-    </div>
-
-    <div>
-        <label class="block text-sm font-medium text-gray-700 mb-2">
-            Lampiran
-        </label>
-
-        <input type="file"
-               name="file"
-               class="w-full px-4 py-2.5 bg-gray-50 border border-gray-300 rounded-lg">
-
-        <p class="text-xs text-gray-500 mt-1">
-            PDF, JPG, JPEG, PNG (Max 2MB)
-        </p>
-    </div>
-
-    <div class="flex items-center justify-end gap-3 pt-6 border-t border-gray-100">
-
+    <div class="mb-4">
         <a href="{{ route('skpd.index') }}"
-           class="px-5 py-2.5 text-sm text-gray-600 bg-gray-100 rounded-lg">
-
-            Batal
-
+           class="inline-flex items-center gap-2 px-4 py-2 bg-white border border-slate-200 hover:bg-slate-50 hover:text-blue-600 rounded-lg text-sm font-medium text-slate-600 transition-colors shadow-sm">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18"></path></svg>
+            Kembali ke Data SKPD
         </a>
-
-        <button type="submit"
-                class="px-5 py-2.5 text-sm text-white bg-purple-600 rounded-lg">
-
-            Simpan SKPD
-
-        </button>
-
     </div>
 
-</form>
+    <div class="bg-white p-6 sm:p-8 rounded-2xl shadow-sm border border-slate-100">
 
+        <div class="mb-8 border-b border-slate-100 pb-5">
+            <h2 class="text-2xl font-bold text-slate-800">
+                Ajukan SKPD
+            </h2>
+            <p class="text-slate-500 text-sm mt-1.5">
+                Buat pengajuan Surat Keterangan Perjalanan Dinas baru untuk pegawai.
+            </p>
+        </div>
+
+        @if ($errors->any())
+            <div class="mb-6 p-4 bg-red-50 border border-red-200 rounded-xl">
+                <p class="text-sm text-red-600 font-medium">Terdapat kesalahan pada form. Silakan periksa kembali isian Anda di bawah.</p>
+            </div>
+        @endif
+
+        <form action="{{ route('skpd.store') }}"
+              method="POST"
+              enctype="multipart/form-data"
+              class="space-y-6">
+
+            @csrf
+
+            <!-- GRUP 1: INFORMASI PEGAWAI -->
+            <div class="space-y-5">
+                <h3 class="text-lg font-bold text-slate-800 mb-4">Informasi Pegawai</h3>
+                
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-5">
+                    <div>
+                        <label class="block text-sm font-semibold text-slate-700 mb-2">
+                            Nama Pegawai
+                        </label>
+                        <input type="text"
+                               name="nama_pegawai"
+                               value="{{ old('nama_pegawai', auth()->user()->name) }}"
+                               required
+                               placeholder="Masukkan nama lengkap"
+                               class="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 focus:bg-white outline-none transition-all text-slate-800 placeholder-slate-400 @error('nama_pegawai') border-red-500 focus:ring-red-500 @enderror">
+                        @error('nama_pegawai')
+                            <p class="text-red-500 text-xs mt-1.5">{{ $message }}</p>
+                        @enderror
+                    </div>
+                </div>
+            </div>
+
+            <hr class="border-slate-100">
+
+            <!-- GRUP 2: DETAIL PERJALANAN -->
+            <div class="space-y-5">
+                <h3 class="text-lg font-bold text-slate-800 mb-4">Detail Perjalanan</h3>
+                
+                <div>
+                    <label class="block text-sm font-semibold text-slate-700 mb-2">
+                        Tujuan Dinas
+                    </label>
+                    <input type="text"
+                           name="tujuan_dinas"
+                           value="{{ old('tujuan_dinas') }}"
+                           required
+                           placeholder="Contoh: Dinas Kesehatan Kota Bandung"
+                           class="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 focus:bg-white outline-none transition-all text-slate-800 placeholder-slate-400 @error('tujuan_dinas') border-red-500 focus:ring-red-500 @enderror">
+                    @error('tujuan_dinas')
+                        <p class="text-red-500 text-xs mt-1.5">{{ $message }}</p>
+                    @enderror
+                </div>
+
+                <div>
+                    <label class="block text-sm font-semibold text-slate-700 mb-2">
+                        Keperluan
+                    </label>
+                    <textarea name="keperluan"
+                              rows="3"
+                              required
+                              placeholder="Jelaskan maksud dan tujuan perjalanan dinas"
+                              class="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 focus:bg-white outline-none transition-all text-slate-800 resize-none placeholder-slate-400 @error('keperluan') border-red-500 focus:ring-red-500 @enderror">{{ old('keperluan') }}</textarea>
+                    @error('keperluan')
+                        <p class="text-red-500 text-xs mt-1.5">{{ $message }}</p>
+                    @enderror
+                </div>
+
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-5">
+                    <div>
+                        <label class="block text-sm font-semibold text-slate-700 mb-2">
+                            Tanggal Berangkat
+                        </label>
+                        <input type="date"
+                               name="tanggal_berangkat"
+                               value="{{ old('tanggal_berangkat') }}"
+                               required
+                               class="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 focus:bg-white outline-none transition-all text-slate-800 @error('tanggal_berangkat') border-red-500 focus:ring-red-500 @enderror">
+                        @error('tanggal_berangkat')
+                            <p class="text-red-500 text-xs mt-1.5">{{ $message }}</p>
+                        @enderror
+                    </div>
+
+                    <div>
+                        <label class="block text-sm font-semibold text-slate-700 mb-2">
+                            Tanggal Kembali
+                        </label>
+                        <input type="date"
+                               name="tanggal_kembali"
+                               value="{{ old('tanggal_kembali') }}"
+                               required
+                               class="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 focus:bg-white outline-none transition-all text-slate-800 @error('tanggal_kembali') border-red-500 focus:ring-red-500 @enderror">
+                        @error('tanggal_kembali')
+                            <p class="text-red-500 text-xs mt-1.5">{{ $message }}</p>
+                        @enderror
+                    </div>
+                </div>
+            </div>
+
+
+
+            <!-- UPLOAD LAMPIRAN -->
+            <div class="space-y-5">
+                <div>
+                    <label class="block text-sm font-semibold text-slate-700 mb-2">
+                        Upload Lampiran <span class="text-slate-400 font-normal">(Opsional)</span>
+                    </label>
+                    <input type="file"
+                           name="file"
+                           class="block w-full text-sm text-slate-500 
+                                  file:mr-4 file:py-2.5 file:px-4 
+                                  file:rounded-lg file:border-0 
+                                  file:text-sm file:font-semibold 
+                                  file:bg-blue-50 file:text-blue-700 
+                                  hover:file:bg-blue-100 transition-all 
+                                  bg-slate-50 border border-slate-200 rounded-xl cursor-pointer focus:outline-none @error('file') border-red-500 @enderror">
+                    <p class="text-xs text-slate-500 mt-2 flex items-center gap-1">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+                        Format: PDF, JPG, PNG (Maks. 2MB)
+                    </p>
+                    @error('file')
+                        <p class="text-red-500 text-xs mt-1.5">{{ $message }}</p>
+                    @enderror
+                </div>
+            </div>
+
+            <!-- AKSI -->
+            <div class="flex items-center justify-end gap-3 pt-8 mt-4 border-t border-slate-100">
+                <a href="{{ route('skpd.index') }}"
+                   class="px-5 py-2.5 text-sm font-medium text-slate-600 bg-white border border-slate-200 hover:bg-slate-50 hover:text-slate-800 rounded-xl transition-colors">
+                    Batal
+                </a>
+
+                <button type="submit"
+                        class="flex items-center gap-2 px-6 py-2.5 text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 rounded-xl shadow-md shadow-blue-500/20 transition-all">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-3m-1 4l-3 3m0 0l-3-3m3 3V4"></path></svg>
+                    Kirim Pengajuan
+                </button>
+            </div>
+
+        </form>
+
+    </div>
 </div>
-
-</body>
-</html>
+@endsection
