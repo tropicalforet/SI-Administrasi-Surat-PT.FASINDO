@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\SuratKeluar;
 use App\Helpers\ActivityHelper;
+use App\Helpers\NomorDokumenHelper;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
 
@@ -76,24 +77,9 @@ class SuratKeluarController extends Controller
         ];
         $bulan = $bulanRomawi[date('n')];
 
-        // Optimasi Performa: Hanya pluck nomor_surat alih-alih seluruh objek database
-        $nomorSuratTahunIni = SuratKeluar::where('kategori_surat', $kategori)
-            ->whereYear('created_at', $tahun)
-            ->where('nomor_surat', 'not like', 'DRAFT-%')
-            ->pluck('nomor_surat');
-
-        $nomorTerakhir = 0;
-        foreach ($nomorSuratTahunIni as $nomor) {
-            $parts = explode('/', $nomor);
-            if (isset($parts[0])) {
-                $angka = (int) $parts[0];
-                if ($angka > $nomorTerakhir) {
-                    $nomorTerakhir = $angka;
-                }
-            }
-        }
-
-        $nomorBaru = $nomorTerakhir + 1;
+        // Nomor diambil dari counter terkunci, bukan dari hasil pembacaan
+        // seluruh surat, agar dua sekretaris tidak mendapat nomor yang sama.
+        $nomorBaru = NomorDokumenHelper::next('surat_keluar:' . $kategori, (int) $tahun);
 
         // Buat slug tujuan agar aman sebagai penomoran surat
         $slugTujuan = strtoupper(preg_replace('/[^A-Za-z0-9]/', '-', $request->tujuan));
@@ -138,7 +124,8 @@ class SuratKeluarController extends Controller
     {
         abort_unless(auth()->user()->role === 'sekretaris', 403, 'Akses ditolak.');
 
-        if ($surat_keluar->status !== 'draft') {
+        // Surat yang ditolak Dirut boleh diperbaiki, lalu diajukan ulang
+        if (!in_array($surat_keluar->status, ['draft', 'ditolak'])) {
             return redirect()->route('surat-keluar.index')->with('error', 'Surat yang sudah diajukan tidak dapat diubah.');
         }
 
@@ -149,7 +136,7 @@ class SuratKeluarController extends Controller
     {
         abort_unless(auth()->user()->role === 'sekretaris', 403, 'Akses ditolak.');
 
-        if ($surat_keluar->status !== 'draft') {
+        if (!in_array($surat_keluar->status, ['draft', 'ditolak'])) {
             return back()->with('error', 'Surat yang sudah diajukan tidak dapat diubah.');
         }
 
@@ -195,11 +182,23 @@ class SuratKeluarController extends Controller
     {
         abort_unless(auth()->user()->role === 'sekretaris', 403, 'Akses ditolak.');
 
+        // Hanya surat yang masih disusun atau baru ditolak yang boleh diajukan,
+        // agar surat yang sudah disetujui tidak bisa dikembalikan ke antrean.
+        if (!in_array($surat_keluar->status, ['draft', 'ditolak'])) {
+            return back()->with('error', 'Surat ini sudah diajukan atau sudah disetujui.');
+        }
+
+        $diajukanUlang = $surat_keluar->status === 'ditolak';
+
         $surat_keluar->update([
-            'status' => 'menunggu_dirut',
+            'status'         => 'menunggu_dirut',
+            'catatan_revisi' => null,
         ]);
-        
-        ActivityHelper::log('Ajukan Persetujuan', 'Mengajukan surat ' . $surat_keluar->nomor_surat . ' untuk persetujuan Direktur Utama');
+
+        ActivityHelper::log(
+            $diajukanUlang ? 'Ajukan Ulang Persetujuan' : 'Ajukan Persetujuan',
+            'Mengajukan surat ' . $surat_keluar->nomor_surat . ' untuk persetujuan Direktur Utama'
+        );
 
         return redirect()->route('surat-keluar.index')->with('success', 'Surat berhasil diajukan untuk persetujuan.');
     }
@@ -233,7 +232,7 @@ class SuratKeluarController extends Controller
                         }
                         
                         // 2. Ganti QR Code
-                        $verifyUrl = route('surat-keluar.verify', $surat_keluar->id);
+                        $verifyUrl = route('surat-keluar.verify', $surat_keluar->verify_token);
                         $qrCodeApiUrl = 'https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=' . urlencode($verifyUrl);
                         
                         $tempQrPath = tempnam(sys_get_temp_dir(), 'qr_');
@@ -338,12 +337,14 @@ class SuratKeluarController extends Controller
     {
         abort_unless(in_array(strtolower(auth()->user()->role ?? ''), ['admin', 'administrator', 'superadmin']), 403, 'Akses ditolak. Hanya admin yang dapat menghapus data.');
 
-        // Validasi draft dihapus sesuai request admin
-
-        if ($surat_keluar->file && Storage::disk('public')->exists($surat_keluar->file)) {
-            Storage::disk('public')->delete($surat_keluar->file);
+        // Surat yang sudah disetujui dan ditandatangani secara elektronik
+        // merupakan dokumen resmi yang telah terbit, sehingga tidak boleh
+        // dihapus meskipun oleh administrator.
+        if ($surat_keluar->status === 'terkirim') {
+            return back()->with('error', 'Surat yang sudah disetujui dan ditandatangani tidak dapat dihapus.');
         }
-        
+
+        // Berkas fisik dipertahankan agar surat masih dapat dipulihkan.
         ActivityHelper::log('Hapus Surat Keluar', 'Menghapus surat ' . $surat_keluar->nomor_surat);
 
         $surat_keluar->delete();
@@ -364,8 +365,25 @@ class SuratKeluarController extends Controller
         return view('surat_keluar.show', compact('surat_keluar'));
     }
 
-    public function verify(SuratKeluar $surat_keluar)
+    public function verify($token)
     {
+        $surat_keluar = null;
+        $parts = explode('-', $token, 2);
+        
+        if (count($parts) === 2) {
+            $id = $parts[0];
+            $candidate = SuratKeluar::find($id);
+            if ($candidate && $candidate->verify_token === $token) {
+                $surat_keluar = $candidate;
+            }
+        } elseif (is_numeric($token) && auth()->check()) {
+            $surat_keluar = SuratKeluar::find($token);
+        }
+
+        if (!$surat_keluar) {
+            abort(404, 'Dokumen Surat Keluar tidak ditemukan atau kode verifikasi tidak valid.');
+        }
+
         $surat_keluar->load(['approvedDirektur', 'approvedDirut']);
         return view('surat_keluar.verify', compact('surat_keluar'));
     }
@@ -422,15 +440,12 @@ class SuratKeluarController extends Controller
     {
         abort_unless(in_array(strtolower(auth()->user()->role ?? ''), ['admin', 'administrator', 'superadmin']), 403, 'Akses ditolak. Hanya admin yang dapat menghapus semua data.');
 
-        // Hapus semua file di folder surat_keluar
-        Storage::disk('public')->deleteDirectory('surat_keluar');
-        Storage::disk('public')->makeDirectory('surat_keluar');
-
         ActivityHelper::log('Hapus Semua Surat Keluar', 'Menghapus seluruh data surat keluar');
-        
-        // Hapus menggunakan Eloquent agar event dan foreign key cascade (jika ada) terpicu
-        SuratKeluar::query()->delete();
 
-        return redirect()->route('surat-keluar.index')->with('success', 'Semua riwayat surat keluar berhasil dihapus secara permanen.');
+        // Surat yang sudah ditandatangani tetap dipertahankan; sisanya pindah
+        // ke arsip terhapus beserta berkasnya.
+        SuratKeluar::where('status', '!=', 'terkirim')->delete();
+
+        return redirect()->route('surat-keluar.index')->with('success', 'Surat keluar yang belum disetujui dipindahkan ke arsip terhapus. Surat yang sudah ditandatangani tetap dipertahankan.');
     }
 }

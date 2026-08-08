@@ -18,7 +18,12 @@ class RoleMiddleware
             abort(403);
         }
 
-        if (!in_array(auth()->user()->role, $roles)) {
+        // Bandingkan dalam huruf kecil agar konsisten dengan pengecekan role
+        // di controller lain yang memakai strtolower()
+        $userRole = strtolower(auth()->user()->role ?? '');
+        $roles = array_map('strtolower', $roles);
+
+        if (!in_array($userRole, $roles)) {
             abort(403, 'Akses ditolak');
         }
 

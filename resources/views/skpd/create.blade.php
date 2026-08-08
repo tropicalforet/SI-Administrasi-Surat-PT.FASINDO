@@ -15,10 +15,10 @@
 
         <div class="mb-8 border-b border-slate-100 pb-5">
             <h2 class="text-2xl font-bold text-slate-800">
-                Ajukan SKPD
+                Buat SKPD
             </h2>
             <p class="text-slate-500 text-sm mt-1.5">
-                Buat pengajuan Surat Keterangan Perjalanan Dinas baru untuk pegawai.
+                Buat Surat Keterangan Perjalanan Dinas berdasarkan Surat Tugas nomor <strong>{{ $suratTugas->nomor_surat_tugas }}</strong>.
             </p>
         </div>
 
@@ -34,6 +34,8 @@
               class="space-y-6">
 
             @csrf
+            
+            <input type="hidden" name="surat_tugas_id" value="{{ $suratTugas->id }}">
 
             <!-- GRUP 1: INFORMASI PEGAWAI -->
             <div class="space-y-5">
@@ -46,13 +48,9 @@
                         </label>
                         <input type="text"
                                name="nama_pegawai"
-                               value="{{ old('nama_pegawai', auth()->user()->name) }}"
-                               required
-                               placeholder="Masukkan nama lengkap"
-                               class="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 focus:bg-white outline-none transition-all text-slate-800 placeholder-slate-400 @error('nama_pegawai') border-red-500 focus:ring-red-500 @enderror">
-                        @error('nama_pegawai')
-                            <p class="text-red-500 text-xs mt-1.5">{{ $message }}</p>
-                        @enderror
+                               value="{{ auth()->user()->name }}"
+                               readonly
+                               class="w-full px-4 py-2.5 bg-slate-100 border border-slate-200 text-slate-500 rounded-xl cursor-not-allowed outline-none font-medium">
                     </div>
                 </div>
             </div>
@@ -69,10 +67,10 @@
                     </label>
                     <input type="text"
                            name="tujuan_dinas"
-                           value="{{ old('tujuan_dinas') }}"
+                           value="{{ old('tujuan_dinas', $suratTugas->tujuan) }}"
                            required
-                           placeholder="Contoh: Dinas Kesehatan Kota Bandung"
-                           class="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 focus:bg-white outline-none transition-all text-slate-800 placeholder-slate-400 @error('tujuan_dinas') border-red-500 focus:ring-red-500 @enderror">
+                           readonly
+                           class="w-full px-4 py-2.5 bg-slate-100 border border-slate-200 text-slate-500 rounded-xl cursor-not-allowed outline-none font-medium">
                     @error('tujuan_dinas')
                         <p class="text-red-500 text-xs mt-1.5">{{ $message }}</p>
                     @enderror
@@ -99,9 +97,10 @@
                         </label>
                         <input type="date"
                                name="tanggal_berangkat"
-                               value="{{ old('tanggal_berangkat') }}"
+                               value="{{ old('tanggal_berangkat', $suratTugas->tanggal_mulai) }}"
                                required
-                               class="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 focus:bg-white outline-none transition-all text-slate-800 @error('tanggal_berangkat') border-red-500 focus:ring-red-500 @enderror">
+                               readonly
+                               class="w-full px-4 py-2.5 bg-slate-100 border border-slate-200 text-slate-500 rounded-xl cursor-not-allowed outline-none font-medium">
                         @error('tanggal_berangkat')
                             <p class="text-red-500 text-xs mt-1.5">{{ $message }}</p>
                         @enderror
@@ -113,9 +112,10 @@
                         </label>
                         <input type="date"
                                name="tanggal_kembali"
-                               value="{{ old('tanggal_kembali') }}"
+                               value="{{ old('tanggal_kembali', $suratTugas->tanggal_selesai) }}"
                                required
-                               class="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 focus:bg-white outline-none transition-all text-slate-800 @error('tanggal_kembali') border-red-500 focus:ring-red-500 @enderror">
+                               readonly
+                               class="w-full px-4 py-2.5 bg-slate-100 border border-slate-200 text-slate-500 rounded-xl cursor-not-allowed outline-none font-medium">
                         @error('tanggal_kembali')
                             <p class="text-red-500 text-xs mt-1.5">{{ $message }}</p>
                         @enderror

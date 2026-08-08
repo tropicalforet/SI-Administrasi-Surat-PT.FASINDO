@@ -28,13 +28,6 @@
                     </p>
                 </div>
 
-                    <a href="{{ route('skpd.create') }}"
-                       class="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white font-medium py-2.5 px-5 rounded-xl transition duration-200 shadow-md shadow-blue-500/20">
-                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path>
-                        </svg>
-                        Ajukan SKPD
-                    </a>
             </div>
 
             <div class="overflow-x-auto">
@@ -42,7 +35,8 @@
                     <thead>
                         <tr class="bg-slate-50 text-slate-500 text-xs uppercase tracking-wider border-b border-slate-200">
                             <th class="py-4 px-6 font-semibold w-16">No</th>
-                            <th class="py-4 px-6 font-semibold">Nomor SKPD</th>
+                            <th class="py-4 px-6 font-semibold">No. SKPD</th>
+                            <th class="py-4 px-6 font-semibold">No. Surat Tugas</th>
                             @if(in_array(strtolower(auth()->user()->role), ['sekretaris', 'dirut']))
                                 <th class="py-4 px-6 font-semibold">Diajukan Oleh</th>
                             @endif
@@ -64,6 +58,10 @@
 
                             <td class="py-4 px-6 font-semibold text-slate-800">
                                 {{ $item->nomor_skpd }}
+                            </td>
+
+                            <td class="py-4 px-6 text-slate-500">
+                                {{ $item->suratTugas->nomor_surat_tugas ?? '-' }}
                             </td>
 
                             @if(in_array(strtolower(auth()->user()->role), ['sekretaris', 'dirut']))

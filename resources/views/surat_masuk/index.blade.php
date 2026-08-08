@@ -138,7 +138,7 @@
                         </td>
 
                         <td class="py-4 px-6">
-                            {{ $item->penerima }}
+                            {{ $item->penerimaUser ? $item->penerimaUser->name . ' (' . ucfirst($item->penerimaUser->role) . ')' : $item->penerima }}
                         </td>
 
                         <td class="py-4 px-6">

@@ -3,9 +3,12 @@
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\SoftDeletes;
 
 class SuratKeluar extends Model
 {
+    use SoftDeletes;
+
     protected $fillable = [
         'nomor_surat',
         'kategori_surat',
@@ -30,11 +33,18 @@ class SuratKeluar extends Model
     );
 }
 
-public function approvedDirut()
-{
-    return $this->belongsTo(
-        User::class,
-        'approved_dirut_by'
-    );
-}
+    public function approvedDirut()
+    {
+        return $this->belongsTo(
+            User::class,
+            'approved_dirut_by'
+        );
+    }
+
+    public function getVerifyTokenAttribute()
+    {
+        $secret = config('app.key') ?: 'eoffice-secret-salt';
+        $hash = substr(hash_hmac('sha256', "SuratKeluar-{$this->id}-{$this->created_at}", $secret), 0, 16);
+        return "{$this->id}-{$hash}";
+    }
 }

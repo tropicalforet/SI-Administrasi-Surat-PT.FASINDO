@@ -58,43 +58,74 @@
 
             <select
                 name="role"
+                id="roleSelect"
                 class="w-full border rounded-lg px-4 py-2"
                 required>
 
                 <option value="">-- Pilih Role --</option>
 
-                <option value="admin">
-                    {{ $user->role == 'admin' ? 'selected' : '' }}>
+                <option value="admin" {{ old('role', $user->role) == 'admin' ? 'selected' : '' }}>
                     Administrator
                 </option>
 
-                <option value="sekretaris">
-                    {{ $user->role == 'sekretaris' ? 'selected' : '' }}>
+                {{-- Akun lama tersimpan dengan role "administrator". Opsi ini
+                     menjaga nilainya tetap utuh saat data diedit. --}}
+                @if(old('role', $user->role) === 'administrator')
+                <option value="administrator" selected>
+                    Administrator
+                </option>
+                @endif
+
+                <option value="sekretaris" {{ old('role', $user->role) == 'sekretaris' ? 'selected' : '' }}>
                     Sekretaris
                 </option>
 
-                <option value="dirut">
-                    {{ $user->role == 'dirut' ? 'selected' : '' }}>
+                <option value="dirut" {{ old('role', $user->role) == 'dirut' ? 'selected' : '' }}>
                     Direktur Utama
                 </option>
 
-                <option value="direktur1">
-                    {{ $user->role == 'direktur1' ? 'selected' : '' }}>
+                <option value="direktur1" {{ old('role', $user->role) == 'direktur1' ? 'selected' : '' }}>
                     Direktur I
                 </option>
 
-                <option value="direktur2">
-                    {{ $user->role == 'direktur2' ? 'selected' : '' }}>
+                <option value="direktur2" {{ old('role', $user->role) == 'direktur2' ? 'selected' : '' }}>
                     Direktur II
                 </option>
 
-                <option value="staff">
-                    {{ $user->role == 'staff' ? 'selected' : '' }}>
+                <option value="staff" {{ old('role', $user->role) == 'staff' ? 'selected' : '' }}>
                     Staff
                 </option>
 
             </select>
 
+        </div>
+
+        {{-- Permission Checkboxes --}}
+        <div id="permissionSection" class="mb-6 hidden">
+            <label class="block mb-3 font-medium text-slate-800">
+                Hak Akses (Permissions)
+            </label>
+            <p class="text-sm text-slate-500 mb-4">Centang modul yang boleh diakses oleh pengguna ini.</p>
+
+            <div class="bg-slate-50 border border-slate-200 rounded-xl p-5 space-y-5">
+                @foreach($permissions as $group => $groupPermissions)
+                    <div>
+                        <p class="text-xs font-bold text-slate-500 uppercase tracking-wider mb-2">{{ $group }}</p>
+                        <div class="grid grid-cols-2 gap-2">
+                            @foreach($groupPermissions as $perm)
+                                <label class="flex items-center gap-2 cursor-pointer hover:bg-white px-3 py-2 rounded-lg transition-colors">
+                                    <input type="checkbox"
+                                           name="permissions[]"
+                                           value="{{ $perm->id }}"
+                                           {{ in_array($perm->id, old('permissions', $userPermissions ?? [])) ? 'checked' : '' }}
+                                           class="w-4 h-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500">
+                                    <span class="text-sm text-slate-700">{{ $perm->label }}</span>
+                                </label>
+                            @endforeach
+                        </div>
+                    </div>
+                @endforeach
+            </div>
         </div>
 
         <div class="flex gap-3">
@@ -120,3 +151,23 @@
 </div>
 
 @endsection
+
+@push('scripts')
+<script>
+    const roleSelect = document.getElementById('roleSelect');
+    const permSection = document.getElementById('permissionSection');
+    const bypassRoles = ['admin', 'administrator', 'superadmin', 'dirut', 'sekretaris'];
+
+    function togglePermissions() {
+        const role = roleSelect.value.toLowerCase();
+        if (role && !bypassRoles.includes(role)) {
+            permSection.classList.remove('hidden');
+        } else {
+            permSection.classList.add('hidden');
+        }
+    }
+
+    roleSelect.addEventListener('change', togglePermissions);
+    document.addEventListener('DOMContentLoaded', togglePermissions);
+</script>
+@endpush

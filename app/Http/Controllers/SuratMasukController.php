@@ -13,6 +13,17 @@ class SuratMasukController extends Controller
     {
         $query = SuratMasuk::query();
 
+        // Filter Hak Akses
+        $user = auth()->user();
+        if (!in_array(strtolower($user->role), ['admin', 'administrator', 'superadmin', 'dirut', 'sekretaris'])) {
+            $query->where(function($q) use ($user) {
+                $q->where('penerima_id', $user->id)
+                  ->orWhereHas('disposisis', function($sq) use ($user) {
+                      $sq->where('kepada_user_id', $user->id);
+                  });
+            });
+        }
+
         // Pencarian Dinamis
         if ($request->filled('search')) {
             $search = $request->search;
@@ -37,10 +48,43 @@ class SuratMasukController extends Controller
         return view('surat_masuk.index', compact('data'));
     }
 
+    /**
+     * Aturan nomor surat yang membedakan bentrokan dengan surat aktif dan
+     * dengan surat yang berada di arsip terhapus. Tanpa pembedaan ini
+     * pengguna menerima pesan "sudah digunakan" untuk surat yang tidak
+     * terlihat di daftar mana pun.
+     *
+     * @param  SuratMasuk|null  $kecuali  Surat yang sedang diedit.
+     */
+    private function aturanNomorSurat(?SuratMasuk $kecuali = null): array
+    {
+        return [
+            'required',
+            function ($attribute, $value, $fail) use ($kecuali) {
+                $query = SuratMasuk::withTrashed()->where('nomor_surat', $value);
+
+                if ($kecuali) {
+                    $query->where('id', '!=', $kecuali->id);
+                }
+
+                $bentrok = $query->first();
+
+                if (!$bentrok) {
+                    return;
+                }
+
+                $fail($bentrok->trashed()
+                    ? 'Nomor surat ini dipakai dokumen di arsip terhapus. Pulihkan dokumen tersebut atau gunakan nomor lain.'
+                    : 'Nomor surat sudah digunakan.');
+            },
+        ];
+    }
+
     public function create()
     {
         abort_unless(auth()->user()->role === 'sekretaris', 403, 'Akses ditolak.');
-        return view('surat_masuk.create');
+        $users = \App\Models\User::orderBy('role')->orderBy('name')->get();
+        return view('surat_masuk.create', compact('users'));
     }
 
     public function store(Request $request)
@@ -48,12 +92,12 @@ class SuratMasukController extends Controller
         abort_unless(auth()->user()->role === 'sekretaris', 403, 'Akses ditolak.');
 
         $validated = $request->validate([
-            'nomor_surat'    => 'required|unique:surat_masuks,nomor_surat', // Pastikan nomor surat tidak ganda
+            'nomor_surat'    => $this->aturanNomorSurat(),
             'kategori_surat' => 'required|string',
             'kategori_surat_lainnya' => 'required_if:kategori_surat,Lainnya|string|nullable',
             'tanggal_surat'  => 'required|date',
             'pengirim'       => 'required|string',
-            'penerima'       => 'required|string',
+            'penerima_id'    => 'required|exists:users,id',
             'perihal'        => 'required|string',
             'file'           => 'nullable|mimes:pdf,jpg,jpeg,png|max:2048',
         ]);
@@ -70,7 +114,8 @@ class SuratMasukController extends Controller
             'kategori_surat' => $kategori,
             'tanggal_surat'  => $validated['tanggal_surat'],
             'pengirim'       => $validated['pengirim'],
-            'penerima'       => $validated['penerima'],
+            'penerima_id'    => $validated['penerima_id'],
+            'penerima'       => \App\Models\User::find($validated['penerima_id'])->name, // Simpan nama penerima sebagai backup/kompatibilitas
             'perihal'        => $validated['perihal'],
             'file'           => $filePath,
             'status'         => 'baru',
@@ -84,7 +129,8 @@ class SuratMasukController extends Controller
     public function edit(SuratMasuk $surat_masuk)
     {
         abort_unless(auth()->user()->role === 'sekretaris', 403, 'Akses ditolak.');
-        return view('surat_masuk.edit', compact('surat_masuk'));
+        $users = \App\Models\User::orderBy('role')->orderBy('name')->get();
+        return view('surat_masuk.edit', compact('surat_masuk', 'users'));
     }
 
     public function update(Request $request, SuratMasuk $surat_masuk)
@@ -92,12 +138,12 @@ class SuratMasukController extends Controller
         abort_unless(auth()->user()->role === 'sekretaris', 403, 'Akses ditolak.');
 
         $validated = $request->validate([
-            'nomor_surat'    => 'required|unique:surat_masuks,nomor_surat,' . $surat_masuk->id, // Abaikan validasi unique untuk surat ini sendiri
+            'nomor_surat'    => $this->aturanNomorSurat($surat_masuk),
             'kategori_surat' => 'required|string',
             'kategori_surat_lainnya' => 'required_if:kategori_surat,Lainnya|string|nullable',
             'tanggal_surat'  => 'required|date',
             'pengirim'       => 'required|string',
-            'penerima'       => 'required|string',
+            'penerima_id'    => 'required|exists:users,id',
             'perihal'        => 'required|string',
             'file'           => 'nullable|mimes:pdf,jpg,jpeg,png|max:2048',
         ]);
@@ -121,7 +167,8 @@ class SuratMasukController extends Controller
             'kategori_surat' => $kategori,
             'tanggal_surat'  => $validated['tanggal_surat'],
             'pengirim'       => $validated['pengirim'],
-            'penerima'       => $validated['penerima'],
+            'penerima_id'    => $validated['penerima_id'],
+            'penerima'       => \App\Models\User::find($validated['penerima_id'])->name, // Simpan nama penerima
             'perihal'        => $validated['perihal'],
             'file'           => $filePath,
         ]);
@@ -135,11 +182,8 @@ class SuratMasukController extends Controller
     {
         abort_unless(in_array(strtolower(auth()->user()->role ?? ''), ['admin', 'administrator', 'superadmin']), 403, 'Akses ditolak. Hanya admin yang dapat menghapus data.');
 
-        // Hapus file fisik dari server sebelum data dihapus dari database
-        if ($surat_masuk->file && Storage::disk('public')->exists($surat_masuk->file)) {
-            Storage::disk('public')->delete($surat_masuk->file);
-        }
-
+        // Berkas fisik sengaja dipertahankan karena data masih dapat dipulihkan
+        // dari arsip terhapus.
         ActivityHelper::log('Hapus Surat Masuk', 'Menghapus surat ' . $surat_masuk->nomor_surat);
         
         $surat_masuk->delete();
@@ -151,15 +195,12 @@ class SuratMasukController extends Controller
     {
         abort_unless(in_array(strtolower(auth()->user()->role ?? ''), ['admin', 'administrator', 'superadmin']), 403, 'Akses ditolak. Hanya admin yang dapat menghapus semua data.');
 
-        // Hapus semua file di folder surat_masuk
-        Storage::disk('public')->deleteDirectory('surat_masuk');
-        Storage::disk('public')->makeDirectory('surat_masuk');
-
         ActivityHelper::log('Hapus Semua Surat Masuk', 'Menghapus seluruh data surat masuk');
-        
-        // Hapus menggunakan Eloquent agar event dan foreign key cascade (jika ada) terpicu
+
+        // Penghapusan bersifat sementara: data pindah ke arsip terhapus dan
+        // berkas fisiknya tetap tersimpan.
         SuratMasuk::query()->delete();
 
-        return redirect()->route('surat-masuk.index')->with('success', 'Semua riwayat surat masuk berhasil dihapus secara permanen.');
+        return redirect()->route('surat-masuk.index')->with('success', 'Semua surat masuk dipindahkan ke arsip terhapus dan masih dapat dipulihkan.');
     }
 }

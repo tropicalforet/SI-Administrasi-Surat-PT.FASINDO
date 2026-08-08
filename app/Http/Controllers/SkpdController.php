@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\Skpd;
 use App\Helpers\ActivityHelper;
+use App\Helpers\NomorDokumenHelper;
 use Illuminate\Http\Request;
 use Carbon\Carbon;
 use Barryvdh\DomPDF\Facade\Pdf;
@@ -36,17 +37,30 @@ class SkpdController extends Controller
         return view('skpd.index', compact('data'));
     }
 
-    public function create()
+    public function create(Request $request)
     {
-        return view('skpd.create');
+        $surat_tugas_id = $request->query('surat_tugas_id');
+        if (!$surat_tugas_id) {
+            abort(403, 'Akses ditolak. SKPD harus dibuat berdasarkan Surat Tugas yang sudah diterbitkan.');
+        }
+
+        $suratTugas = \App\Models\SuratTugas::find($surat_tugas_id);
+        if (!$suratTugas || $suratTugas->status !== 'diterbitkan') {
+            abort(403, 'Akses ditolak. Surat Tugas tidak ditemukan atau belum diterbitkan.');
+        }
+
+        // Cek jika Surat Tugas sudah punya SKPD
+        if ($suratTugas->skpd()->exists()) {
+            abort(403, 'Akses ditolak. SKPD untuk Surat Tugas ini sudah pernah dibuat.');
+        }
+
+        return view('skpd.create', compact('suratTugas'));
     }
 
     public function store(Request $request)
     {
-        $role = strtolower(auth()->user()->role);
-
         $rules = [
-            'nama_pegawai'            => 'required|string',
+            'surat_tugas_id'          => 'required|exists:surat_tugas,id',
             'tujuan_dinas'            => 'required|string',
             'keperluan'               => 'required|string',
             'tanggal_berangkat'       => 'required|date',
@@ -56,24 +70,26 @@ class SkpdController extends Controller
 
         $validated = $request->validate($rules);
 
+        $suratTugas = \App\Models\SuratTugas::findOrFail($request->surat_tugas_id);
+        if ($suratTugas->status !== 'diterbitkan') {
+            abort(403, 'Surat Tugas belum diterbitkan.');
+        }
+        if ($suratTugas->skpd()->exists()) {
+            abort(403, 'SKPD untuk Surat Tugas ini sudah pernah dibuat.');
+        }
+
         $tanggalBerangkat = Carbon::parse($request->tanggal_berangkat);
         $tanggalKembali = Carbon::parse($request->tanggal_kembali);
         $durasi = $tanggalBerangkat->diffInDays($tanggalKembali) + 1;
-
-        // Nilai biaya default 0, akan diisi oleh Direktur 2
-        $biaya_transport = 0;
-        $biaya_penginapan = 0;
-        $biaya_konsumsi_per_hari = 0;
-        $totalBiaya = 0;
 
         $filePath = null;
         if ($request->hasFile('file')) {
             $filePath = $request->file('file')->store('skpd', 'public');
         }
 
-        // Pembuatan nomor urut otomatis
-        $lastId = Skpd::max('id');
-        $nomorUrut = $lastId ? $lastId + 1 : 1;
+        // Nomor urut diambil dari counter terkunci per tahun. Sebelumnya dipakai
+        // max(id)+1 yang menghasilkan nomor ganda begitu ada data yang dihapus.
+        $nomorUrut = NomorDokumenHelper::next('skpd', (int) date('Y'));
         $nomor_skpd = 'SKPD-' . str_pad($nomorUrut, 3, '0', STR_PAD_LEFT) . '/' . date('m') . '/' . date('Y');
 
         // Semua pengajuan baru langsung diperiksa oleh Dirut
@@ -81,22 +97,19 @@ class SkpdController extends Controller
 
         $skpd = Skpd::create([
             'user_id'                 => auth()->id(),
+            'surat_tugas_id'          => $suratTugas->id,
             'nomor_skpd'              => $nomor_skpd,
-            'nama_pegawai'            => $request->nama_pegawai,
+            'nama_pegawai'            => auth()->user()->name,
             'tujuan_dinas'            => $request->tujuan_dinas,
             'keperluan'               => $request->keperluan,
             'tanggal_berangkat'       => $request->tanggal_berangkat,
             'tanggal_kembali'         => $request->tanggal_kembali,
             'durasi_hari'             => $durasi,
-            'biaya_transport'         => $biaya_transport,
-            'biaya_penginapan'        => $biaya_penginapan,
-            'biaya_konsumsi_per_hari' => $biaya_konsumsi_per_hari,
-            'total_biaya'             => $totalBiaya,
             'file'                    => $filePath,
             'status'                  => $status,
         ]);
 
-        ActivityHelper::log('Tambah SKPD', 'Membuat pengajuan SKPD nomor ' . $nomor_skpd . ' untuk ' . $request->nama_pegawai);
+        ActivityHelper::log('Tambah SKPD', 'Membuat pengajuan SKPD nomor ' . $nomor_skpd . ' untuk ' . auth()->user()->name);
 
         return redirect()->route('skpd.index')->with('success', 'SKPD berhasil diajukan');
     }
@@ -144,7 +157,6 @@ class SkpdController extends Controller
         }
 
         $rules = [
-            'nama_pegawai'            => 'required|string',
             'tujuan_dinas'            => 'required|string',
             'keperluan'               => 'required|string',
             'tanggal_berangkat'       => 'required|date',
@@ -158,12 +170,6 @@ class SkpdController extends Controller
         $tanggalKembali = Carbon::parse($request->tanggal_kembali);
         $durasi = $tanggalBerangkat->diffInDays($tanggalKembali) + 1;
 
-        $biaya_transport = $skpd->biaya_transport;
-        $biaya_penginapan = $skpd->biaya_penginapan;
-        $biaya_konsumsi_per_hari = $skpd->biaya_konsumsi_per_hari;
-
-        $totalBiaya = $biaya_transport + $biaya_penginapan + ($biaya_konsumsi_per_hari * $durasi);
-
         $filePath = $skpd->file;
         if ($request->hasFile('file')) {
             if ($filePath && Storage::disk('public')->exists($filePath)) {
@@ -174,21 +180,16 @@ class SkpdController extends Controller
 
         $status = $skpd->status;
         if ($status === 'ditolak') {
-            // Pengajuan ulang setelah direvisi kembali ke 'menunggu_keuangan'
-            $status = 'menunggu_keuangan';
+            // Pengajuan ulang setelah direvisi kembali masuk antrean pemeriksaan Dirut
+            $status = 'diperiksa';
         }
 
         $skpd->update([
-            'nama_pegawai'            => $request->nama_pegawai,
             'tujuan_dinas'            => $request->tujuan_dinas,
             'keperluan'               => $request->keperluan,
             'tanggal_berangkat'       => $request->tanggal_berangkat,
             'tanggal_kembali'         => $request->tanggal_kembali,
             'durasi_hari'             => $durasi,
-            'biaya_transport'         => $biaya_transport,
-            'biaya_penginapan'        => $biaya_penginapan,
-            'biaya_konsumsi_per_hari' => $biaya_konsumsi_per_hari,
-            'total_biaya'             => $totalBiaya,
             'file'                    => $filePath,
             'status'                  => $status,
         ]);
@@ -232,7 +233,7 @@ class SkpdController extends Controller
     {
         $role = strtolower(auth()->user()->role);
 
-        if ($skpd->status !== 'disetujui' && $skpd->status !== 'diperiksa' && $skpd->status !== 'menunggu_keuangan' && !in_array($role, ['sekretaris', 'dirut', 'direktur1'])) {
+        if ($skpd->status !== 'disetujui' && $skpd->status !== 'diperiksa' && !in_array($role, ['sekretaris', 'dirut', 'direktur1'])) {
             abort(403, 'Akses ditolak.');
         }
 
@@ -289,10 +290,13 @@ class SkpdController extends Controller
             abort(403, 'Akses ditolak. Anda tidak memiliki izin untuk menghapus data SKPD ini.');
         }
 
-        if ($skpd->file && Storage::disk('public')->exists($skpd->file)) {
-            Storage::disk('public')->delete($skpd->file);
+        // SKPD yang sudah disetujui Dirut adalah dokumen terbit dan menjadi
+        // dasar pertanggungjawaban perjalanan dinas.
+        if ($skpd->status === 'disetujui') {
+            return back()->with('error', 'SKPD yang sudah disetujui tidak dapat dihapus.');
         }
 
+        // Berkas fisik dipertahankan agar SKPD masih dapat dipulihkan.
         ActivityHelper::log('Hapus SKPD', 'Menghapus SKPD nomor ' . $skpd->nomor_skpd);
 
         $skpd->delete();
@@ -300,15 +304,32 @@ class SkpdController extends Controller
         return redirect()->route('skpd.index')->with('success', 'SKPD berhasil dihapus');
     }
 
-    public function verify(Skpd $skpd)
+    public function verify($token)
     {
+        $skpd = null;
+        $parts = explode('-', $token, 2);
+        
+        if (count($parts) === 2) {
+            $id = $parts[0];
+            $candidate = Skpd::find($id);
+            if ($candidate && $candidate->verify_token === $token) {
+                $skpd = $candidate;
+            }
+        } elseif (is_numeric($token) && auth()->check()) {
+            $skpd = Skpd::find($token);
+        }
+
+        if (!$skpd) {
+            abort(404, 'Dokumen SKPD tidak ditemukan atau kode verifikasi tidak valid.');
+        }
+
         $skpd->load(['user']);
         return view('skpd.verify', compact('skpd'));
     }
 
     private function getQrCodeBase64(Skpd $skpd)
     {
-        $verifyUrl = route('skpd.verify', $skpd->id);
+        $verifyUrl = route('skpd.verify', $skpd->verify_token);
         $qrCodeApiUrl = 'https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=' . urlencode($verifyUrl);
         
         try {

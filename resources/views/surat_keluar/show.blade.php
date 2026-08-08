@@ -233,14 +233,14 @@
                     <p class="text-xs text-slate-500 mb-4">Pindai QR Code di bawah untuk memverifikasi keabsahan tanda tangan elektronik (E-Sign) surat ini secara publik.</p>
                     
                     <div class="bg-slate-50 p-4 rounded-xl border border-slate-100 inline-block mb-3">
-                        <img src="https://api.qrserver.com/v1/create-qr-code/?size=150x150&data={{ urlencode(route('surat-keluar.verify', $surat_keluar->id)) }}"
+                        <img src="https://api.qrserver.com/v1/create-qr-code/?size=150x150&data={{ urlencode(route('surat-keluar.verify', $surat_keluar->verify_token)) }}"
                              alt="QR Code Verifikasi E-Sign"
                              class="w-36 h-36 mx-auto bg-white p-2 rounded-lg border border-slate-200">
                     </div>
                     
                     <div class="text-[10px] font-medium text-slate-400">
-                        <a href="{{ route('surat-keluar.verify', $surat_keluar->id) }}" target="_blank" class="text-blue-500 hover:underline">
-                            {{ route('surat-keluar.verify', $surat_keluar->id) }}
+                        <a href="{{ route('surat-keluar.verify', $surat_keluar->verify_token) }}" target="_blank" class="text-blue-500 hover:underline">
+                            {{ route('surat-keluar.verify', $surat_keluar->verify_token) }}
                         </a>
                     </div>
                 </div>

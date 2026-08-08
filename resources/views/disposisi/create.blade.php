@@ -74,18 +74,20 @@
                 <!-- Penerima Disposisi -->
                 <div>
                     <label class="block text-sm font-semibold text-slate-700 mb-2">
-                        Penerima Disposisi
+                        Penerima Disposisi (Bisa pilih lebih dari satu)
                     </label>
-                    <select name="kepada_user_id"
-                            required
-                            class="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 focus:bg-white outline-none transition-all text-slate-800 cursor-pointer @error('kepada_user_id') border-red-500 focus:ring-red-500 @enderror">
-                        <option value="" disabled {{ old('kepada_user_id') ? '' : 'selected' }}>-- Pilih Penerima --</option>
+                    <div class="space-y-2 mt-2">
                         @foreach($users as $user)
-                            <option value="{{ $user->id }}" {{ old('kepada_user_id') == $user->id ? 'selected' : '' }}>
-                                {{ $user->name }} ({{ strtoupper($user->role) }})
-                            </option>
+                            <label class="flex items-center gap-3 p-3 border border-slate-200 rounded-xl cursor-pointer hover:bg-slate-50 transition-colors">
+                                <input type="checkbox" name="kepada_user_id[]" value="{{ $user->id }}" 
+                                       class="w-5 h-5 text-blue-600 rounded border-slate-300 focus:ring-blue-500"
+                                       {{ is_array(old('kepada_user_id')) && in_array($user->id, old('kepada_user_id')) ? 'checked' : '' }}>
+                                <span class="text-sm font-medium text-slate-800">
+                                    {{ $user->name }} <span class="text-xs text-slate-500 ml-1">({{ strtoupper($user->role) }})</span>
+                                </span>
+                            </label>
                         @endforeach
-                    </select>
+                    </div>
                     @error('kepada_user_id')
                         <p class="text-red-500 text-xs mt-1.5">{{ $message }}</p>
                     @enderror

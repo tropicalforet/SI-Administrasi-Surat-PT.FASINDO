@@ -142,14 +142,19 @@
                 <!-- Penerima -->
                 <div>
                     <label class="block text-sm font-semibold text-slate-700 mb-2">
-                        Penerima
+                        Penerima (Tujuan Surat)
                     </label>
-                    <input type="text"
-                           name="penerima"
-                           value="{{ old('penerima', $surat_masuk->penerima) }}"
-                           required
-                           class="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 focus:bg-white outline-none transition-all text-slate-800 @error('penerima') border-red-500 focus:ring-red-500 @enderror">
-                    @error('penerima')
+                    <select name="penerima_id"
+                            required
+                            class="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 focus:bg-white outline-none transition-all text-slate-800 @error('penerima_id') border-red-500 focus:ring-red-500 @enderror">
+                        <option value="" disabled>Pilih Penerima</option>
+                        @foreach($users as $user)
+                            <option value="{{ $user->id }}" {{ old('penerima_id', $surat_masuk->penerima_id) == $user->id ? 'selected' : '' }}>
+                                {{ $user->name }} ({{ ucfirst($user->role) }})
+                            </option>
+                        @endforeach
+                    </select>
+                    @error('penerima_id')
                         <p class="text-red-500 text-xs mt-1.5">{{ $message }}</p>
                     @enderror
                 </div>

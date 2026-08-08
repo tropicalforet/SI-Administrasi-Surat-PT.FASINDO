@@ -58,7 +58,9 @@
     <!-- Sembunyikan Statistik & Daftar Surat Khusus Administrator -->
     @if(!in_array(strtolower(auth()->user()->role ?? ''), ['admin', 'administrator', 'superadmin']))
         
-        <div class="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-6 gap-5 mb-8">
+        <h3 class="text-lg font-bold text-slate-800 mb-4">Surat &amp; Disposisi</h3>
+
+        <div class="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-5 mb-8">
             <div class="bg-white p-5 rounded-xl shadow-sm border border-slate-100 flex items-center justify-between hover:shadow-md transition-shadow">
                 <div>
                     <p class="text-sm font-medium text-slate-500">Surat Masuk</p>
@@ -88,8 +90,8 @@
             </div>
             <div class="bg-white p-5 rounded-xl shadow-sm border border-slate-100 flex items-center justify-between hover:shadow-md transition-shadow">
                 <div>
-                    <p class="text-sm font-medium text-slate-500">Dikirim</p>
-                    <h2 class="text-2xl font-bold text-slate-800 mt-1">{{ $totalDikirim ?? 0 }}</h2>
+                    <p class="text-sm font-medium text-slate-500">Menunggu Persetujuan</p>
+                    <h2 class="text-2xl font-bold text-slate-800 mt-1">{{ $totalMenungguDirut ?? 0 }}</h2>
                 </div>
                 <div class="w-12 h-12 rounded-full bg-cyan-50 text-cyan-600 flex items-center justify-center">
                     <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8"></path></svg>
@@ -97,11 +99,20 @@
             </div>
             <div class="bg-white p-5 rounded-xl shadow-sm border border-slate-100 flex items-center justify-between hover:shadow-md transition-shadow">
                 <div>
-                    <p class="text-sm font-medium text-slate-500">Selesai</p>
-                    <h2 class="text-2xl font-bold text-slate-800 mt-1">{{ $totalSelesai ?? 0 }}</h2>
+                    <p class="text-sm font-medium text-slate-500">Terkirim</p>
+                    <h2 class="text-2xl font-bold text-slate-800 mt-1">{{ $totalTerkirim ?? 0 }}</h2>
                 </div>
                 <div class="w-12 h-12 rounded-full bg-emerald-50 text-emerald-600 flex items-center justify-center">
                     <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+                </div>
+            </div>
+            <div class="bg-white p-5 rounded-xl shadow-sm border border-slate-100 flex items-center justify-between hover:shadow-md transition-shadow">
+                <div>
+                    <p class="text-sm font-medium text-slate-500">Ditolak</p>
+                    <h2 class="text-2xl font-bold text-slate-800 mt-1">{{ $totalDitolak ?? 0 }}</h2>
+                </div>
+                <div class="w-12 h-12 rounded-full bg-red-50 text-red-600 flex items-center justify-center">
+                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2m7-2a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
                 </div>
             </div>
             <div class="bg-white p-5 rounded-xl shadow-sm border border-slate-100 flex items-center justify-between hover:shadow-md transition-shadow">
@@ -111,6 +122,54 @@
                 </div>
                 <div class="w-12 h-12 rounded-full bg-orange-50 text-orange-600 flex items-center justify-center">
                     <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+                </div>
+            </div>
+        </div>
+
+        <h3 class="text-lg font-bold text-slate-800 mb-1">Perjalanan Dinas (SKPD)</h3>
+        <p class="text-sm text-slate-500 mb-4">
+            @if(in_array(strtolower(auth()->user()->role ?? ''), ['dirut', 'sekretaris']))
+                Seluruh pengajuan perjalanan dinas.
+            @else
+                Pengajuan perjalanan dinas milik Anda.
+            @endif
+        </p>
+
+        <div class="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-5 mb-8">
+            <div class="bg-white p-5 rounded-xl shadow-sm border border-slate-100 flex items-center justify-between hover:shadow-md transition-shadow">
+                <div>
+                    <p class="text-sm font-medium text-slate-500">Total SKPD</p>
+                    <h2 class="text-2xl font-bold text-slate-800 mt-1">{{ $totalSkpd ?? 0 }}</h2>
+                </div>
+                <div class="w-12 h-12 rounded-full bg-indigo-50 text-indigo-600 flex items-center justify-center">
+                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 13.255A23.931 23.931 0 0112 15c-3.183 0-6.22-.62-9-1.745M16 6V4a2 2 0 00-2-2h-4a2 2 0 00-2 2v2m4 6h.01M5 20h14a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"></path></svg>
+                </div>
+            </div>
+            <div class="bg-white p-5 rounded-xl shadow-sm border border-slate-100 flex items-center justify-between hover:shadow-md transition-shadow">
+                <div>
+                    <p class="text-sm font-medium text-slate-500">Menunggu Persetujuan</p>
+                    <h2 class="text-2xl font-bold text-slate-800 mt-1">{{ $skpdPending ?? 0 }}</h2>
+                </div>
+                <div class="w-12 h-12 rounded-full bg-amber-50 text-amber-600 flex items-center justify-center">
+                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+                </div>
+            </div>
+            <div class="bg-white p-5 rounded-xl shadow-sm border border-slate-100 flex items-center justify-between hover:shadow-md transition-shadow">
+                <div>
+                    <p class="text-sm font-medium text-slate-500">Disetujui</p>
+                    <h2 class="text-2xl font-bold text-slate-800 mt-1">{{ $skpdDisetujui ?? 0 }}</h2>
+                </div>
+                <div class="w-12 h-12 rounded-full bg-emerald-50 text-emerald-600 flex items-center justify-center">
+                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
+                </div>
+            </div>
+            <div class="bg-white p-5 rounded-xl shadow-sm border border-slate-100 flex items-center justify-between hover:shadow-md transition-shadow">
+                <div>
+                    <p class="text-sm font-medium text-slate-500">Ditolak</p>
+                    <h2 class="text-2xl font-bold text-slate-800 mt-1">{{ $skpdDitolak ?? 0 }}</h2>
+                </div>
+                <div class="w-12 h-12 rounded-full bg-red-50 text-red-600 flex items-center justify-center">
+                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2m7-2a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
                 </div>
             </div>
         </div>

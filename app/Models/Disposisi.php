@@ -3,9 +3,12 @@
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\SoftDeletes;
 
 class Disposisi extends Model
 {
+    use SoftDeletes;
+
     protected $fillable = [
         'surat_masuk_id',
         'dari_user_id',
@@ -20,8 +23,27 @@ class Disposisi extends Model
     ];
 
     protected $casts = [
-        'batas_waktu' => 'date',
+        'batas_waktu'          => 'date',
+        'diingatkan_pada'      => 'datetime',
+        'dieskalasi_pada'      => 'datetime',
+        'siap_konfirmasi_pada' => 'datetime',
     ];
+
+    /**
+     * Masih ada disposisi lanjutan yang belum selesai.
+     */
+    public function punyaAnakBelumSelesai(): bool
+    {
+        return $this->children()->where('status', '!=', 'selesai')->exists();
+    }
+
+    /**
+     * Punya disposisi lanjutan dan seluruhnya sudah selesai.
+     */
+    public function semuaAnakSelesai(): bool
+    {
+        return $this->children()->exists() && !$this->punyaAnakBelumSelesai();
+    }
 
     public function suratMasuk()
     {

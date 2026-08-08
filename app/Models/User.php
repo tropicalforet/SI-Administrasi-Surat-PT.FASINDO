@@ -44,4 +44,28 @@ class User extends Authenticatable
     {
         return $this->hasMany(Disposisi::class, 'kepada_user_id');
     }
+
+    // ==========================
+    // RELASI PERMISSION (RBAC)
+    // ==========================
+
+    public function permissions()
+    {
+        return $this->belongsToMany(Permission::class);
+    }
+
+    /**
+     * Cek apakah user memiliki permission tertentu.
+     * Role admin/dirut/sekretaris otomatis punya semua akses.
+     */
+    public function hasPermission(string $permissionName): bool
+    {
+        $bypassRoles = ['admin', 'administrator', 'superadmin', 'dirut', 'sekretaris'];
+
+        if (in_array(strtolower($this->role), $bypassRoles)) {
+            return true;
+        }
+
+        return $this->permissions()->where('name', $permissionName)->exists();
+    }
 }

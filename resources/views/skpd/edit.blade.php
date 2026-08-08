@@ -29,7 +29,7 @@
                 Edit SKPD
             </h2>
             <p class="text-slate-500 text-sm mt-1.5">
-                Perbarui data Surat Keterangan Perjalanan Dinas atau rincian biaya.
+                Perbarui data Surat Keterangan Perjalanan Dinas.
             </p>
         </div>
 
@@ -67,12 +67,9 @@
                         </label>
                         <input type="text"
                                name="nama_pegawai"
-                               value="{{ old('nama_pegawai', $skpd->nama_pegawai) }}"
-                               required
-                               class="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 focus:bg-white outline-none transition-all text-slate-800 @error('nama_pegawai') border-red-500 focus:ring-red-500 @enderror">
-                        @error('nama_pegawai')
-                            <p class="text-red-500 text-xs mt-1.5">{{ $message }}</p>
-                        @enderror
+                               value="{{ $skpd->nama_pegawai }}"
+                               readonly
+                               class="w-full px-4 py-2.5 bg-slate-100 border border-slate-200 text-slate-500 rounded-xl cursor-not-allowed outline-none font-medium">
                     </div>
 
 
