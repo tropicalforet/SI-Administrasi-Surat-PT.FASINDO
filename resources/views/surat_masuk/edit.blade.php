@@ -139,20 +139,19 @@
                     @enderror
                 </div>
 
+                <!-- Sifat & Jalur Penerimaan -->
+                @include('surat_masuk.partials.sifat-jalur', [
+                    'sifat' => old('sifat', $surat_masuk->sifat),
+                    'jalur' => old('jalur_penerimaan', $surat_masuk->jalur_penerimaan),
+                ])
+
                 <!-- Penerima -->
-                <div>
-                    <label class="block text-sm font-semibold text-slate-700 mb-2">
-                        Penerima
-                    </label>
-                    <input type="text"
-                           name="penerima"
-                           value="{{ old('penerima', $surat_masuk->penerima) }}"
-                           required
-                           class="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 focus:bg-white outline-none transition-all text-slate-800 @error('penerima') border-red-500 focus:ring-red-500 @enderror">
-                    @error('penerima')
-                        <p class="text-red-500 text-xs mt-1.5">{{ $message }}</p>
-                    @enderror
-                </div>
+                @include('surat_masuk.partials.penerima', [
+                    'users'         => $users,
+                    'penerimaTipe'  => old('penerima_tipe', $surat_masuk->penerima_role ? 'role' : 'user'),
+                    'penerimaId'    => old('penerima_id', $surat_masuk->penerima_id),
+                    'penerimaRole'  => old('penerima_role', $surat_masuk->penerima_role),
+                ])
 
                 <!-- Perihal -->
                 <div>

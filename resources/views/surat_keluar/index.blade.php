@@ -176,10 +176,10 @@
                                     </a>
 
                                     @if(auth()->user()->role == 'sekretaris')
-                                        @if($item->status == 'draft')
+                                        @if(in_array($item->status, ['draft', 'ditolak']))
                                             <a href="{{ route('surat-keluar.edit', $item->id) }}"
                                                class="bg-amber-50 text-amber-600 hover:bg-amber-100 border border-amber-100 px-3 py-1.5 rounded-md text-xs font-semibold transition-colors">
-                                                Edit
+                                                {{ $item->status == 'ditolak' ? 'Revisi' : 'Edit' }}
                                             </a>
 
                                             <form action="{{ route('surat-keluar.submit', $item->id) }}"
@@ -190,7 +190,7 @@
                                                 @method('PUT')
                                                 <button type="submit"
                                                         class="bg-blue-50 text-blue-600 hover:bg-blue-100 border border-blue-100 px-3 py-1.5 rounded-md text-xs font-semibold transition-colors">
-                                                    Ajukan
+                                                    {{ $item->status == 'ditolak' ? 'Ajukan Ulang' : 'Ajukan' }}
                                                 </button>
                                             </form>
 

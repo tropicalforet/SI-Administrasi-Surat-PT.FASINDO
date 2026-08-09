@@ -24,7 +24,8 @@
                         <th class="border px-4 py-2 text-left">No</th>
                         <th class="border px-4 py-2 text-left">Nama</th>
                         <th class="border px-4 py-2 text-left">Email</th>
-                        <th class="border px-4 py-2 text-left">Role</th>
+                        <th class="border px-4 py-2 text-left">Jabatan</th>
+                        <th class="border px-4 py-2 text-left">Unit Kerja</th>
                         <th class="border px-4 py-2 text-center">Aksi</th>
                     </tr>
                 </thead>
@@ -34,7 +35,24 @@
                         <td class="border px-4 py-2">{{ $loop->iteration }}</td>
                         <td class="border px-4 py-2">{{ $item->name }}</td>
                         <td class="border px-4 py-2">{{ $item->email }}</td>
-                        <td class="border px-4 py-2">{{ ucfirst($item->role) }}</td>
+                        <td class="border px-4 py-2">
+                            {{ $item->label_jabatan }}
+                            @if($item->jabatan)
+                                <span class="block text-xs text-slate-400">{{ \App\Models\User::LABEL_ROLE[strtolower($item->role)] ?? $item->role }}</span>
+                            @endif
+                        </td>
+                        <td class="border px-4 py-2">
+                            @if($item->unit)
+                                {{ $item->label_unit }}
+                            @elseif(in_array($item->role, \App\Models\User::ROLE_WAJIB_UNIT))
+                                <span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold bg-amber-50 text-amber-700 border border-amber-200"
+                                      title="Tanpa unit kerja, pengguna ini tidak muncul sebagai tujuan disposisi">
+                                    Belum ditetapkan
+                                </span>
+                            @else
+                                <span class="text-slate-400">&mdash;</span>
+                            @endif
+                        </td>
                         <td class="border px-4 py-2 text-center">
                             <a href="{{ route('users.edit', $item->id) }}" class="bg-yellow-500 hover:bg-yellow-600 text-white px-3 py-1 rounded transition-colors mr-2">Edit</a>
                             @if($item->id != auth()->id())
@@ -50,7 +68,7 @@
                     </tr>
                     @empty
                     <tr>
-                        <td colspan="5" class="text-center py-6 text-slate-500">Tidak ada data.</td>
+                        <td colspan="6" class="text-center py-6 text-slate-500">Tidak ada data.</td>
                     </tr>
                     @endforelse
                 </tbody>

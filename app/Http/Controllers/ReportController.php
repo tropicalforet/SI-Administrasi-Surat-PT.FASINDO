@@ -37,11 +37,14 @@ class ReportController extends Controller
             $query->where('status', $request->status);
         }
 
+        if ($request->filled('sifat')) {
+            $query->where('sifat', $request->sifat);
+        }
+
         if (!$this->isAdminLevel()) {
-            // Hanya lihat surat masuk yang ditujukan kepada user (disposisi)
-            $query->whereHas('disposisis', function($q) {
-                $q->where('kepada_user_id', auth()->id());
-            });
+            // Pakai aturan baca yang sama dengan daftar surat masuk, agar surat
+            // yang ditujukan ke role pengguna tetap muncul walau belum didisposisikan.
+            $query->dapatDibacaOleh(auth()->user());
         }
 
         return $query->latest('tanggal_surat')->get();
@@ -150,14 +153,9 @@ class ReportController extends Controller
         if ($request->filled('start_date') && $request->filled('end_date')) {
             $query->whereBetween('tanggal_berangkat', [$request->start_date, $request->end_date]);
         }
-        
-        if ($request->filled('nama_pegawai')) {
-            $query->where('nama_pegawai', 'like', '%' . $request->nama_pegawai . '%');
-        }
 
-        if (!$this->isAdminLevel()) {
-            $query->where('user_id', auth()->id());
-        }
+        // Terapkan ke semua role: Laporan SKPD hanya menampilkan data milik sendiri
+        $query->where('user_id', auth()->id());
 
         return $query->latest('tanggal_berangkat')->get();
     }
@@ -165,11 +163,7 @@ class ReportController extends Controller
     public function skpd(Request $request)
     {
         $data = $this->querySkpd($request);
-        
-        // List pegawai unik berdasarkan yang pernah diajukan
-        $pegawaiList = Skpd::select('nama_pegawai')->distinct()->pluck('nama_pegawai');
-        
-        return view('reports.skpd', compact('data', 'pegawaiList'));
+        return view('reports.skpd', compact('data'));
     }
 
     public function skpdPdf(Request $request)

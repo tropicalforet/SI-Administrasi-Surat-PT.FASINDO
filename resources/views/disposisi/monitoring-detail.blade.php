@@ -74,17 +74,17 @@
                 <div class="space-y-4 text-sm">
                     <div>
                         <span class="block text-xs font-semibold text-slate-500 mb-1">Nomor Surat</span>
-                        <span class="font-bold text-slate-800">{{ $disposisi->suratMasuk->nomor_surat }}</span>
+                        <span class="font-bold text-slate-800">{{ $disposisi->suratMasuk?->nomor_surat }}</span>
                     </div>
                     
                     <div>
                         <span class="block text-xs font-semibold text-slate-500 mb-1">Pengirim</span>
-                        <span class="text-slate-800">{{ $disposisi->suratMasuk->pengirim }}</span>
+                        <span class="text-slate-800">{{ $disposisi->suratMasuk?->pengirim }}</span>
                     </div>
 
                     <div>
                         <span class="block text-xs font-semibold text-slate-500 mb-1">Perihal</span>
-                        <span class="text-slate-800 leading-relaxed">{{ $disposisi->suratMasuk->perihal }}</span>
+                        <span class="text-slate-800 leading-relaxed">{{ $disposisi->suratMasuk?->perihal }}</span>
                     </div>
 
                     <div>
@@ -100,8 +100,8 @@
 
                 <!-- Tombol File -->
                 <div class="mt-8 pt-5 border-t border-slate-100">
-                    @if($disposisi->suratMasuk->file)
-                        <a href="{{ asset('storage/'.$disposisi->suratMasuk->file) }}" target="_blank"
+                    @if($disposisi->suratMasuk?->file)
+                        <a href="{{ asset('storage/'.$disposisi->suratMasuk?->file) }}" target="_blank"
                            class="flex items-center justify-center gap-2 w-full bg-blue-50 hover:bg-blue-100 text-blue-700 border border-blue-200 px-4 py-2.5 rounded-xl text-sm font-semibold transition-colors">
                             <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l6.414-6.586a4 4 0 00-5.656-5.656l-6.415 6.585a6 6 0 108.486 8.486L20.5 13"></path></svg>
                             Lihat Dokumen Lampiran

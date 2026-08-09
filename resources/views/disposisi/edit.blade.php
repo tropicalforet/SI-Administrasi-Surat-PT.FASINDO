@@ -61,22 +61,22 @@
                         <div class="space-y-4 text-sm">
                             <div class="flex flex-col sm:flex-row sm:items-start gap-1 sm:gap-4">
                                 <span class="font-semibold text-slate-600 sm:w-1/3">Nomor Surat</span>
-                                <span class="text-slate-800 font-medium sm:w-2/3">{{ $disposisi->suratMasuk->nomor_surat }}</span>
+                                <span class="text-slate-800 font-medium sm:w-2/3">{{ $disposisi->suratMasuk?->nomor_surat }}</span>
                             </div>
                             
                             <div class="flex flex-col sm:flex-row sm:items-start gap-1 sm:gap-4">
                                 <span class="font-semibold text-slate-600 sm:w-1/3">Tanggal</span>
-                                <span class="text-slate-800 sm:w-2/3">{{ \Carbon\Carbon::parse($disposisi->suratMasuk->tanggal_surat)->translatedFormat('d F Y') }}</span>
+                                <span class="text-slate-800 sm:w-2/3">{{ \Carbon\Carbon::parse($disposisi->suratMasuk?->tanggal_surat)->translatedFormat('d F Y') }}</span>
                             </div>
 
                             <div class="flex flex-col sm:flex-row sm:items-start gap-1 sm:gap-4">
                                 <span class="font-semibold text-slate-600 sm:w-1/3">Pengirim</span>
-                                <span class="text-slate-800 sm:w-2/3">{{ $disposisi->suratMasuk->pengirim }}</span>
+                                <span class="text-slate-800 sm:w-2/3">{{ $disposisi->suratMasuk?->pengirim }}</span>
                             </div>
 
                             <div class="flex flex-col sm:flex-row sm:items-start gap-1 sm:gap-4">
                                 <span class="font-semibold text-slate-600 sm:w-1/3">Perihal</span>
-                                <span class="text-slate-800 sm:w-2/3">{{ $disposisi->suratMasuk->perihal }}</span>
+                                <span class="text-slate-800 sm:w-2/3">{{ $disposisi->suratMasuk?->perihal }}</span>
                             </div>
 
                             <div class="flex flex-col sm:flex-row sm:items-start gap-1 sm:gap-4">
@@ -135,8 +135,8 @@
                         <div class="bg-slate-50 px-5 py-3 border-b border-slate-200 flex justify-between items-center">
                             <h2 class="text-sm font-bold text-slate-800 uppercase tracking-wider">Preview Dokumen</h2>
                             
-                            @if($disposisi->suratMasuk->file)
-                            <a href="{{ asset('storage/'.$disposisi->suratMasuk->file) }}" target="_blank"
+                            @if($disposisi->suratMasuk?->file)
+                            <a href="{{ asset('storage/'.$disposisi->suratMasuk?->file) }}" target="_blank"
                                class="flex items-center gap-1.5 text-xs font-semibold bg-white border border-slate-300 text-slate-600 hover:text-blue-600 hover:border-blue-300 px-3 py-1.5 rounded-lg transition-colors">
                                 <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"></path></svg>
                                 Tab Baru
@@ -145,17 +145,17 @@
                         </div>
 
                         <div class="p-2 flex-1 bg-slate-100">
-                            @if($disposisi->suratMasuk->file)
+                            @if($disposisi->suratMasuk?->file)
                                 @php
-                                    $ext = strtolower(pathinfo($disposisi->suratMasuk->file, PATHINFO_EXTENSION));
+                                    $ext = strtolower(pathinfo($disposisi->suratMasuk?->file, PATHINFO_EXTENSION));
                                 @endphp
 
                                 @if($ext == 'pdf')
-                                    <iframe src="{{ asset('storage/'.$disposisi->suratMasuk->file) }}" 
+                                    <iframe src="{{ asset('storage/'.$disposisi->suratMasuk?->file) }}" 
                                             class="w-full h-[400px] lg:h-[500px] rounded-lg shadow-sm border border-slate-200 bg-white"></iframe>
                                 @else
                                     <div class="w-full h-[400px] lg:h-[500px] overflow-auto rounded-lg shadow-sm border border-slate-200 bg-white p-2 flex justify-center">
-                                        <img src="{{ asset('storage/'.$disposisi->suratMasuk->file) }}" class="max-w-full h-auto rounded">
+                                        <img src="{{ asset('storage/'.$disposisi->suratMasuk?->file) }}" class="max-w-full h-auto rounded">
                                     </div>
                                 @endif
                             @else

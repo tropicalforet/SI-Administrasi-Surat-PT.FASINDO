@@ -54,12 +54,12 @@
                         </td>
 
                         <td class="py-4 px-6 font-semibold text-slate-800 whitespace-nowrap">
-                            {{ $item->suratMasuk->nomor_surat }}
+                            {{ $item->suratMasuk?->nomor_surat }}
                         </td>
 
                         <td class="py-4 px-6 max-w-xs">
-                            <span class="line-clamp-2" title="{{ $item->suratMasuk->perihal }}">
-                                {{ $item->suratMasuk->perihal }}
+                            <span class="line-clamp-2" title="{{ $item->suratMasuk?->perihal }}">
+                                {{ $item->suratMasuk?->perihal }}
                             </span>
                         </td>
 

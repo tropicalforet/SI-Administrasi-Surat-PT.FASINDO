@@ -51,7 +51,7 @@
                 <tr>
                     <td class="text-center">{{ $loop->iteration }}</td>
                     <td class="text-center">{{ \Carbon\Carbon::parse($item->created_at)->format('d/m/Y') }}</td>
-                    <td>{{ $item->suratMasuk->nomor_surat ?? '-' }}</td>
+                    <td>{{ $item->suratMasuk?->nomor_surat ?? '-' }}</td>
                     <td>{{ $item->dariUser->name ?? '-' }}</td>
                     <td>{{ $item->kepadaUser->name ?? '-' }}</td>
                     <td>{{ $item->instruksi }}</td>

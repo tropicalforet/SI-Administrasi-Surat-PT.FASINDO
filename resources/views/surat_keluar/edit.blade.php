@@ -77,6 +77,10 @@
                    class="w-full px-4 py-2.5 bg-gray-50 border border-gray-300 rounded-lg">
         </div>
 
+        @include('surat_keluar.partials.unit-verifikasi', [
+            'unitVerifikasi' => old('unit_verifikasi', $surat_keluar->unit_verifikasi),
+        ])
+
         <div>
             <label class="block text-sm font-medium text-gray-700 mb-2">
                 Tujuan Surat

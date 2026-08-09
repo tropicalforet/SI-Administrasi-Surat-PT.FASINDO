@@ -2,10 +2,14 @@
     $skpdPendingCount = 0;
     $suratKeluarPendingCount = 0;
     $disposisiPendingCount = 0;
+    $notifikasiBelumDibaca = 0;
     if (auth()->check()) {
+        $notifikasiBelumDibaca = auth()->user()->unreadNotifications()->count();
         $userRole = strtolower(auth()->user()->role);
         if ($userRole === 'sekretaris') {
-            $skpdPendingCount = \App\Models\Skpd::where('status', 'pengajuan')->count();
+            // SKPD baru selalu tersimpan dengan status 'diperiksa'; status
+            // 'pengajuan' hanya default kolom lama yang tidak pernah dipakai.
+            $skpdPendingCount = \App\Models\Skpd::where('status', 'diperiksa')->count();
         } elseif ($userRole === 'dirut') {
             $skpdPendingCount = \App\Models\Skpd::where('status', 'diperiksa')->count();
             $suratKeluarPendingCount = \App\Models\SuratKeluar::where('status', 'menunggu_dirut')->count();
@@ -37,6 +41,18 @@
             Dashboard
         </a>
 
+        <!-- Notifikasi -->
+        <a href="{{ route('notifikasi.index') }}"
+           class="flex items-center gap-3 px-4 py-3 rounded-xl font-medium transition-all {{ request()->routeIs('notifikasi.*') ? 'bg-blue-600 text-white shadow-md shadow-blue-500/20' : 'hover:bg-slate-800 hover:text-white' }}">
+            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9"></path></svg>
+            <span>Notifikasi</span>
+            @if($notifikasiBelumDibaca > 0)
+                <span class="ml-auto inline-flex items-center justify-center min-w-5 h-5 px-1.5 text-[10px] font-bold text-white bg-red-500 rounded-full">
+                    {{ $notifikasiBelumDibaca > 99 ? '99+' : $notifikasiBelumDibaca }}
+                </span>
+            @endif
+        </a>
+
         <!-- System Section (Admin Only) -->
         @if(in_array(strtolower(auth()->user()->role), ['admin', 'administrator', 'superadmin']))
             <div class="pt-4 pb-1">
@@ -56,24 +72,36 @@
                 <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 17v-6m4 6V7m4 10V4M5 20h14"></path></svg>
                 Activity Log
             </a>
+
+            <!-- Arsip Terhapus -->
+            <a href="{{ route('arsip.index') }}"
+               class="flex items-center gap-3 px-4 py-3 rounded-xl font-medium transition-all {{ request()->routeIs('arsip.*') ? 'bg-blue-600 text-white shadow-md shadow-blue-500/20' : 'hover:bg-slate-800 hover:text-white' }}">
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg>
+                Arsip Terhapus
+            </a>
         @endif
 
-        <!-- General Employee Section (Including Admin for full access) -->
-            
-            <!-- Mail Section -->
-            @if(in_array(strtolower(auth()->user()->role), ['admin', 'administrator', 'superadmin', 'sekretaris', 'dirut', 'direktur1', 'direktur2', 'staff']))
-                <div class="pt-4 pb-1">
-                    <p class="px-4 text-[10px] font-bold text-slate-500 uppercase tracking-wider">Persuratan</p>
-                </div>
+        <!-- Mail Section (Permission-based) -->
+        @php
+            $hasSuratMasuk = \App\Models\SuratMasuk::where('penerima_id', auth()->id())->exists();
+            $canAccessSuratMasuk = auth()->user()->hasPermission('akses_surat_masuk') || $hasSuratMasuk;
+        @endphp
+        @if($canAccessSuratMasuk || auth()->user()->hasPermission('akses_surat_keluar'))
+            <div class="pt-4 pb-1">
+                <p class="px-4 text-[10px] font-bold text-slate-500 uppercase tracking-wider">Persuratan</p>
+            </div>
 
-                <!-- Surat Masuk -->
+            <!-- Surat Masuk -->
+            @if($canAccessSuratMasuk)
                 <a href="{{ route('surat-masuk.index') }}" 
                    class="flex items-center gap-3 px-4 py-3 rounded-xl font-medium transition-all {{ request()->routeIs('surat-masuk.*') ? 'bg-blue-600 text-white shadow-md shadow-blue-500/20' : 'hover:bg-slate-800 hover:text-white' }}">
                     <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 13V6a2 2 0 00-2-2H6a2 2 0 00-2 2v7m16 0v5a2 2 0 01-2 2H6a2 2 0 01-2-2v-5m16 0h-2.586a1 1 0 00-.707.293l-2.414 2.414a1 1 0 01-.707.293h-3.172a1 1 0 01-.707-.293l-2.414-2.414A1 1 0 006.586 13H4"></path></svg>
                     Surat Masuk
                 </a>
+            @endif
 
-                <!-- Surat Keluar -->
+            <!-- Surat Keluar -->
+            @if(auth()->user()->hasPermission('akses_surat_keluar'))
                 <a href="{{ route('surat-keluar.index') }}" 
                    class="flex items-center gap-3 px-4 py-3 rounded-xl font-medium transition-all {{ request()->routeIs('surat-keluar.*') ? 'bg-blue-600 text-white shadow-md shadow-blue-500/20' : 'hover:bg-slate-800 hover:text-white' }}">
                     <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8"></path></svg>
@@ -85,42 +113,46 @@
                     @endif
                 </a>
             @endif
+        @endif
 
-            <!-- Perjalanan Dinas Section -->
-            @if(!in_array(strtolower(auth()->user()->role), ['admin', 'administrator', 'superadmin']))
-                <div class="pt-4 pb-1">
-                    <p class="px-4 text-[10px] font-bold text-slate-500 uppercase tracking-wider">Perjalanan Dinas</p>
-                </div>
+        <!-- Perjalanan Dinas Section (Permission-based) -->
+        @if(auth()->user()->hasPermission('akses_skpd') && !in_array(strtolower(auth()->user()->role), ['admin', 'administrator', 'superadmin']))
+            <div class="pt-4 pb-1">
+                <p class="px-4 text-[10px] font-bold text-slate-500 uppercase tracking-wider">Perjalanan Dinas</p>
+            </div>
 
-                <!-- SKPD Route Dynamic Label -->
-                <a href="{{ route('skpd.index') }}" 
-                   class="flex items-center gap-3 px-4 py-3 rounded-xl font-medium transition-all {{ request()->routeIs('skpd.*') ? 'bg-blue-600 text-white shadow-md shadow-blue-500/20' : 'hover:bg-slate-800 hover:text-white' }}">
-                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"></path></svg>
-                    <span>
-                        @if(strtolower(auth()->user()->role) == 'sekretaris')
-                            Data SKPD
-                        @elseif(strtolower(auth()->user()->role) == 'dirut')
-                            Persetujuan SKPD
-                        @else
-                            SKPD Saya
-                        @endif
-                    </span>
-                    @if($skpdPendingCount > 0)
-                        <span class="ml-auto inline-flex items-center justify-center w-5 h-5 text-[10px] font-bold text-white bg-red-500 rounded-full">
-                            {{ $skpdPendingCount }}
-                        </span>
+            {{-- Menu Surat Tugas dihapus: modulnya digabung ke SKPD. --}}
+
+            <!-- SKPD Route Dynamic Label -->
+            <a href="{{ route('skpd.index') }}" 
+               class="flex items-center gap-3 px-4 py-3 rounded-xl font-medium transition-all {{ request()->routeIs('skpd.*') ? 'bg-blue-600 text-white shadow-md shadow-blue-500/20' : 'hover:bg-slate-800 hover:text-white' }}">
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"></path></svg>
+                <span>
+                    @if(strtolower(auth()->user()->role) == 'sekretaris')
+                        Data SKPD
+                    @elseif(strtolower(auth()->user()->role) == 'dirut')
+                        Persetujuan SKPD
+                    @else
+                        SKPD Saya
                     @endif
-                </a>
-            @endif
+                </span>
+                @if($skpdPendingCount > 0)
+                    <span class="ml-auto inline-flex items-center justify-center w-5 h-5 text-[10px] font-bold text-white bg-red-500 rounded-full">
+                        {{ $skpdPendingCount }}
+                    </span>
+                @endif
+            </a>
+        @endif
 
 
-            <!-- Tasks & Disposition Section -->
-            @if(in_array(strtolower(auth()->user()->role), ['dirut', 'direktur1', 'direktur2', 'sekretaris', 'staff']))
-                <div class="pt-4 pb-1">
-                    <p class="px-4 text-[10px] font-bold text-slate-500 uppercase tracking-wider">Tugas & Disposisi</p>
-                </div>
+        <!-- Tasks & Disposition Section (Permission-based) -->
+        @if(auth()->user()->hasPermission('akses_disposisi') || auth()->user()->hasPermission('akses_monitoring'))
+            <div class="pt-4 pb-1">
+                <p class="px-4 text-[10px] font-bold text-slate-500 uppercase tracking-wider">Tugas & Disposisi</p>
+            </div>
 
-                <!-- Disposisi Saya -->
+            <!-- Disposisi Saya -->
+            @if(auth()->user()->hasPermission('akses_disposisi'))
                 <a href="{{ route('disposisi.saya') }}" 
                    class="flex items-center gap-3 px-4 py-3 rounded-xl font-medium transition-all {{ request()->routeIs('disposisi.saya*') ? 'bg-blue-600 text-white shadow-md shadow-blue-500/20' : 'hover:bg-slate-800 hover:text-white' }}">
                     <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4"></path></svg>
@@ -133,48 +165,68 @@
                 </a>
             @endif
 
-            <!-- Monitoring (Dirut, Sekretaris only) -->
-            @if(in_array(strtolower(auth()->user()->role), ['dirut', 'sekretaris']))
+            <!-- Monitoring -->
+            @if(auth()->user()->hasPermission('akses_monitoring'))
                 <a href="{{ route('disposisi.monitoring') }}" 
                    class="flex items-center gap-3 px-4 py-3 rounded-xl font-medium transition-all {{ request()->routeIs('disposisi.monitoring*') ? 'bg-blue-600 text-white shadow-md shadow-blue-500/20' : 'hover:bg-slate-800 hover:text-white' }}">
                     <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"></path></svg>
                     Monitoring
                 </a>
             @endif
+        @endif
 
-            <!-- Laporan Section -->
+        <!-- Laporan Section (Permission-based) -->
+        @if(auth()->user()->hasPermission('akses_laporan_surat_masuk') || auth()->user()->hasPermission('akses_laporan_surat_keluar') || auth()->user()->hasPermission('akses_laporan_disposisi') || auth()->user()->hasPermission('akses_laporan_skpd'))
             <div class="pt-4 pb-1">
                 <p class="px-4 text-[10px] font-bold text-slate-500 uppercase tracking-wider">Laporan & Rekapitulasi</p>
             </div>
 
-            <!-- Laporan Surat Masuk -->
-            <a href="{{ route('laporan.surat-masuk') }}" 
-               class="flex items-center gap-3 px-4 py-3 rounded-xl font-medium transition-all {{ request()->routeIs('laporan.surat-masuk') ? 'bg-blue-600 text-white shadow-md shadow-blue-500/20' : 'hover:bg-slate-800 hover:text-white' }}">
-                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path></svg>
-                Lap. Surat Masuk
-            </a>
+            @if(auth()->user()->hasPermission('akses_laporan_surat_masuk'))
+                <!-- Laporan Surat Masuk -->
+                <a href="{{ route('laporan.surat-masuk') }}" 
+                   class="flex items-center gap-3 px-4 py-3 rounded-xl font-medium transition-all {{ request()->routeIs('laporan.surat-masuk') ? 'bg-blue-600 text-white shadow-md shadow-blue-500/20' : 'hover:bg-slate-800 hover:text-white' }}">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path></svg>
+                    Lap. Surat Masuk
+                </a>
+            @endif
 
-            <!-- Laporan Surat Keluar -->
-            <a href="{{ route('laporan.surat-keluar') }}" 
-               class="flex items-center gap-3 px-4 py-3 rounded-xl font-medium transition-all {{ request()->routeIs('laporan.surat-keluar') ? 'bg-blue-600 text-white shadow-md shadow-blue-500/20' : 'hover:bg-slate-800 hover:text-white' }}">
-                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"></path></svg>
-                Lap. Surat Keluar
-            </a>
+            @if(auth()->user()->hasPermission('akses_laporan_surat_keluar'))
+                <!-- Laporan Surat Keluar -->
+                <a href="{{ route('laporan.surat-keluar') }}" 
+                   class="flex items-center gap-3 px-4 py-3 rounded-xl font-medium transition-all {{ request()->routeIs('laporan.surat-keluar') ? 'bg-blue-600 text-white shadow-md shadow-blue-500/20' : 'hover:bg-slate-800 hover:text-white' }}">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"></path></svg>
+                    Lap. Surat Keluar
+                </a>
+            @endif
 
-            <!-- Laporan Disposisi -->
-            <a href="{{ route('laporan.disposisi') }}" 
-               class="flex items-center gap-3 px-4 py-3 rounded-xl font-medium transition-all {{ request()->routeIs('laporan.disposisi') ? 'bg-blue-600 text-white shadow-md shadow-blue-500/20' : 'hover:bg-slate-800 hover:text-white' }}">
-                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"></path></svg>
-                Lap. Disposisi
-            </a>
+            @if(auth()->user()->hasPermission('akses_laporan_disposisi'))
+                <!-- Laporan Disposisi -->
+                <a href="{{ route('laporan.disposisi') }}" 
+                   class="flex items-center gap-3 px-4 py-3 rounded-xl font-medium transition-all {{ request()->routeIs('laporan.disposisi') ? 'bg-blue-600 text-white shadow-md shadow-blue-500/20' : 'hover:bg-slate-800 hover:text-white' }}">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"></path></svg>
+                    Lap. Disposisi
+                </a>
+            @endif
 
-            <!-- Laporan SKPD -->
-            <a href="{{ route('laporan.skpd') }}" 
-               class="flex items-center gap-3 px-4 py-3 rounded-xl font-medium transition-all {{ request()->routeIs('laporan.skpd') ? 'bg-blue-600 text-white shadow-md shadow-blue-500/20' : 'hover:bg-slate-800 hover:text-white' }}">
-                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"></path></svg>
-                Lap. SKPD
-            </a>
+            @if(auth()->user()->hasPermission('akses_laporan_skpd'))
+                <!-- Laporan SKPD -->
+                <a href="{{ route('laporan.skpd') }}" 
+                   class="flex items-center gap-3 px-4 py-3 rounded-xl font-medium transition-all {{ request()->routeIs('laporan.skpd') ? 'bg-blue-600 text-white shadow-md shadow-blue-500/20' : 'hover:bg-slate-800 hover:text-white' }}">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"></path></svg>
+                    Lap. SKPD
+                </a>
+            @endif
+        @endif
 
+        <!-- Profile Settings (All Users) -->
+        <div class="pt-4 pb-1">
+            <p class="px-4 text-[10px] font-bold text-slate-500 uppercase tracking-wider">Pengaturan</p>
+        </div>
+        <a href="{{ route('profile.edit') }}" 
+           class="flex items-center gap-3 px-4 py-3 rounded-xl font-medium transition-all {{ request()->routeIs('profile.*') ? 'bg-blue-600 text-white shadow-md shadow-blue-500/20' : 'hover:bg-slate-800 hover:text-white' }}">
+            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"></path></svg>
+            Profil & Password
+        </a>
 
     </nav>
 

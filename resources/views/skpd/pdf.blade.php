@@ -71,6 +71,17 @@
 </head>
 <body>
 
+{{-- Penanda bagi dokumen yang belum disetujui, agar hasil cetak pratinjau
+     tidak disangka dokumen final. --}}
+@if($belumDisetujui ?? false)
+    <div style="border: 2px dashed #b91c1c; color: #b91c1c; text-align: center;
+                font-weight: bold; letter-spacing: 2px; padding: 6px;
+                margin-bottom: 12px; font-size: 10pt;">
+        PRATINJAU &mdash; BELUM DISETUJUI
+    </div>
+@endif
+
+
     <!-- KOP SURAT -->
     <div class="text-center kop-border">
         @if(file_exists(public_path('images/logo.png')))
