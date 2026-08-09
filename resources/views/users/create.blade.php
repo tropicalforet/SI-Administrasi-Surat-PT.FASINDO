@@ -50,46 +50,11 @@
                 required>
         </div>
 
-        <div class="mb-6">
-            <label class="block mb-2 font-medium">
-                Role
-            </label>
-
-            <select
-                name="role"
-                id="roleSelect"
-                class="w-full border rounded-lg px-4 py-2"
-                required>
-
-                <option value="">-- Pilih Role --</option>
-
-                <option value="admin" {{ old('role') == 'admin' ? 'selected' : '' }}>
-                    Administrator
-                </option>
-
-                <option value="sekretaris" {{ old('role') == 'sekretaris' ? 'selected' : '' }}>
-                    Sekretaris
-                </option>
-
-                <option value="dirut" {{ old('role') == 'dirut' ? 'selected' : '' }}>
-                    Direktur Utama
-                </option>
-
-                <option value="direktur1" {{ old('role') == 'direktur1' ? 'selected' : '' }}>
-                    Direktur I
-                </option>
-
-                <option value="direktur2" {{ old('role') == 'direktur2' ? 'selected' : '' }}>
-                    Direktur II
-                </option>
-
-                <option value="staff" {{ old('role') == 'staff' ? 'selected' : '' }}>
-                    Staff
-                </option>
-
-            </select>
-
-        </div>
+        @include('users.partials.struktur', [
+            'role'    => old('role'),
+            'unit'    => old('unit'),
+            'jabatan' => old('jabatan'),
+        ])
 
         {{-- Permission Checkboxes --}}
         <div id="permissionSection" class="mb-6 hidden">

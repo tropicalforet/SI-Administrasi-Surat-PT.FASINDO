@@ -26,6 +26,9 @@ function dataSuratBaru(string $nomor, User $penerima): array
         'kategori_surat' => 'Undangan',
         'tanggal_surat'  => '2026-08-05',
         'pengirim'       => 'Dinas Lain',
+        'sifat'          => 'biasa',
+        'jalur_penerimaan' => 'kurir',
+        'penerima_tipe'  => 'user',
         'penerima_id'    => $penerima->id,
         'perihal'        => 'Undangan rapat',
     ];
@@ -71,6 +74,9 @@ test('surat dapat diedit tanpa dianggap bentrok dengan dirinya sendiri', functio
             'kategori_surat' => 'Undangan',
             'tanggal_surat'  => '2026-08-05',
             'pengirim'       => 'Dinas Contoh',
+            'sifat'          => 'biasa',
+            'jalur_penerimaan' => 'kurir',
+            'penerima_tipe'  => 'user',
             'penerima_id'    => $sekretaris->id,
             'perihal'        => 'Perihal diperbarui',
         ])
@@ -90,6 +96,9 @@ test('pesan arsip juga muncul saat mengedit surat lain', function () {
             'kategori_surat' => 'Undangan',
             'tanggal_surat'  => '2026-08-05',
             'pengirim'       => 'Dinas Contoh',
+            'sifat'          => 'biasa',
+            'jalur_penerimaan' => 'kurir',
+            'penerima_tipe'  => 'user',
             'penerima_id'    => $sekretaris->id,
             'perihal'        => 'Coba pakai nomor arsip',
         ])

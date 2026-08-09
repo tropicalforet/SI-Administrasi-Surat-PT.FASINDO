@@ -13,6 +13,7 @@ function suratDitolak(): SuratKeluar
     return SuratKeluar::create([
         'nomor_surat'    => '001/FI/Undangan TEST/VIII/2026',
         'kategori_surat' => 'Undangan',
+        'unit_verifikasi'     => 'teknik',
         'tanggal_surat'  => '2026-08-01',
         'tujuan'         => 'PT Contoh',
         'perihal'        => 'Undangan rapat',
@@ -34,6 +35,7 @@ test('surat yang ditolak dapat diperbarui tanpa kehilangan catatan revisi', func
 
     $this->actingAs(sekretaris())->put('/surat-keluar/' . $surat->id, [
         'tanggal_surat' => '2026-08-05',
+        'unit_verifikasi'    => 'teknik',
         'tujuan'        => 'PT Contoh',
         'perihal'       => 'Undangan rapat (revisi)',
     ]);
@@ -45,7 +47,11 @@ test('surat yang ditolak dapat diperbarui tanpa kehilangan catatan revisi', func
         ->and($surat->catatan_revisi)->toBe('Perbaiki tanggal rapat.');
 });
 
-test('surat yang ditolak dapat diajukan ulang ke dirut', function () {
+test('surat yang ditolak dapat diajukan ulang, kembali dari tahap verifikasi', function () {
+    // Sejak verifikasi berjenjang berlaku, pengajuan ulang masuk lagi ke direktur
+    // bidangnya lebih dulu, bukan langsung ke Direktur Utama.
+    User::factory()->create(['role' => 'direktur2', 'unit' => 'teknik']);
+
     $surat = suratDitolak();
 
     $this->actingAs(sekretaris())
@@ -54,7 +60,7 @@ test('surat yang ditolak dapat diajukan ulang ke dirut', function () {
 
     $surat->refresh();
 
-    expect($surat->status)->toBe('menunggu_dirut')
+    expect($surat->status)->toBe('menunggu_direktur')
         ->and($surat->catatan_revisi)->toBeNull();
 });
 

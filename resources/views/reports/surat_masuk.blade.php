@@ -37,9 +37,18 @@
                 <label class="block text-xs font-semibold text-slate-700 mb-1">Status</label>
                 <select name="status" class="w-full text-sm border-slate-300 rounded-lg focus:border-blue-500 focus:ring-blue-500">
                     <option value="">-- Semua Status --</option>
-                    <option value="belum_diproses" {{ request('status') == 'belum_diproses' ? 'selected' : '' }}>Belum Diproses</option>
-                    <option value="disposisi" {{ request('status') == 'disposisi' ? 'selected' : '' }}>Didisposisikan</option>
-                    <option value="selesai" {{ request('status') == 'selesai' ? 'selected' : '' }}>Selesai</option>
+                    @foreach(\App\Models\SuratMasuk::STATUS as $nilai => $label)
+                        <option value="{{ $nilai }}" {{ request('status') == $nilai ? 'selected' : '' }}>{{ $label }}</option>
+                    @endforeach
+                </select>
+            </div>
+            <div>
+                <label class="block text-xs font-semibold text-slate-700 mb-1">Sifat</label>
+                <select name="sifat" class="w-full text-sm border-slate-300 rounded-lg focus:border-blue-500 focus:ring-blue-500">
+                    <option value="">-- Semua Sifat --</option>
+                    @foreach(\App\Models\SuratMasuk::SIFAT as $nilai => $label)
+                        <option value="{{ $nilai }}" {{ request('sifat') == $nilai ? 'selected' : '' }}>{{ $label }}</option>
+                    @endforeach
                 </select>
             </div>
             <div class="md:col-span-4 flex gap-2 justify-end mt-2">
@@ -63,6 +72,7 @@
                         <th class="py-4 px-6 font-semibold">Tanggal Surat</th>
                         <th class="py-4 px-6 font-semibold">Nomor Surat</th>
                         <th class="py-4 px-6 font-semibold">Pengirim</th>
+                        <th class="py-4 px-6 font-semibold">Sifat</th>
                         <th class="py-4 px-6 font-semibold">Perihal</th>
                         <th class="py-4 px-6 font-semibold">Status</th>
                     </tr>
@@ -73,23 +83,21 @@
                             <td class="py-4 px-6">{{ $loop->iteration }}</td>
                             <td class="py-4 px-6 whitespace-nowrap">{{ \Carbon\Carbon::parse($item->tanggal_surat)->translatedFormat('d M Y') }}</td>
                             <td class="py-4 px-6 font-medium text-slate-800">{{ $item->nomor_surat }}</td>
-                            <td class="py-4 px-6">{{ $item->pengirim }}</td>
+                            <td class="py-4 px-6">
+                                {{ $item->pengirim }}
+                                @if($item->jalur_penerimaan)
+                                    <span class="block text-xs text-slate-400 mt-0.5">via {{ $item->label_jalur }}</span>
+                                @endif
+                            </td>
+                            <td class="py-4 px-6">{{ $item->label_sifat }}</td>
                             <td class="py-4 px-6">{{ $item->perihal }}</td>
                             <td class="py-4 px-6">
-                                @if(strtolower($item->status) == 'belum_diproses')
-                                    <span class="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold bg-red-50 text-red-700 border border-red-200">Belum Diproses</span>
-                                @elseif(strtolower($item->status) == 'disposisi')
-                                    <span class="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold bg-yellow-50 text-yellow-700 border border-yellow-200">Disposisi</span>
-                                @elseif(strtolower($item->status) == 'selesai')
-                                    <span class="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200">Selesai</span>
-                                @else
-                                    <span class="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold bg-slate-50 text-slate-700 border border-slate-200">{{ ucfirst($item->status) }}</span>
-                                @endif
+                                @include('surat_masuk.partials.badge-status', ['surat' => $item])
                             </td>
                         </tr>
                     @empty
                         <tr>
-                            <td colspan="6" class="py-8 text-center text-slate-500">
+                            <td colspan="7" class="py-8 text-center text-slate-500">
                                 <div class="flex flex-col items-center justify-center">
                                     <svg class="w-12 h-12 text-slate-300 mb-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 13V6a2 2 0 00-2-2H6a2 2 0 00-2 2v7m16 0v5a2 2 0 01-2 2H6a2 2 0 01-2-2v-5m16 0h-2.586a1 1 0 00-.707.293l-2.414 2.414a1 1 0 01-.707.293h-3.172a1 1 0 01-.707-.293l-2.414-2.414A1 1 0 006.586 13H4"></path></svg>
                                     <p class="font-medium text-slate-600">Tidak ada data laporan.</p>

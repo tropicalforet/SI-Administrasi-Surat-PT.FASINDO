@@ -32,18 +32,21 @@
     <div class="filters">
         <p><strong>Periode:</strong> {{ $request->start_date ? \Carbon\Carbon::parse($request->start_date)->format('d/m/Y') : '-' }} s/d {{ $request->end_date ? \Carbon\Carbon::parse($request->end_date)->format('d/m/Y') : '-' }}</p>
         <p><strong>Pengirim:</strong> {{ $request->pengirim ?: 'Semua' }}</p>
-        <p><strong>Status:</strong> {{ $request->status ? ucfirst(str_replace('_', ' ', $request->status)) : 'Semua' }}</p>
+        <p><strong>Status:</strong> {{ $request->status ? \App\Models\SuratMasuk::STATUS[$request->status] ?? ucfirst($request->status) : 'Semua' }}</p>
+        <p><strong>Sifat:</strong> {{ $request->sifat ? \App\Models\SuratMasuk::SIFAT[$request->sifat] ?? ucfirst($request->sifat) : 'Semua' }}</p>
     </div>
 
     <table>
         <thead>
             <tr>
                 <th style="width: 5%">No</th>
-                <th style="width: 15%">Tanggal Surat</th>
-                <th style="width: 20%">Nomor Surat</th>
-                <th style="width: 20%">Pengirim</th>
-                <th style="width: 25%">Perihal</th>
-                <th style="width: 15%">Status</th>
+                <th style="width: 13%">Tanggal Surat</th>
+                <th style="width: 18%">Nomor Surat</th>
+                <th style="width: 18%">Pengirim</th>
+                <th style="width: 10%">Sifat</th>
+                <th style="width: 11%">Diterima Via</th>
+                <th style="width: 15%">Perihal</th>
+                <th style="width: 10%">Status</th>
             </tr>
         </thead>
         <tbody>
@@ -53,12 +56,14 @@
                     <td class="text-center">{{ \Carbon\Carbon::parse($item->tanggal_surat)->format('d/m/Y') }}</td>
                     <td>{{ $item->nomor_surat }}</td>
                     <td>{{ $item->pengirim }}</td>
+                    <td class="text-center">{{ $item->label_sifat }}</td>
+                    <td class="text-center">{{ $item->label_jalur }}</td>
                     <td>{{ $item->perihal }}</td>
-                    <td class="text-center">{{ ucfirst(str_replace('_', ' ', $item->status)) }}</td>
+                    <td class="text-center">{{ $item->label_status }}</td>
                 </tr>
             @empty
                 <tr>
-                    <td colspan="6" class="text-center">Tidak ada data</td>
+                    <td colspan="8" class="text-center">Tidak ada data</td>
                 </tr>
             @endforelse
         </tbody>

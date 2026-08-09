@@ -3,14 +3,13 @@
 @section('content')
 <div class="p-8">
     @php
-    $role = match(auth()->user()->role ?? ''){
-        'dirut' => 'Direktur Utama',
-        'direktur1' => 'Direktur Keuangan & Administrasi',
-        'direktur2' => 'Direktur Teknik',
-        'sekretaris' => 'Sekretaris',
-        'staff' => 'Staff',
-        default => auth()->user()->role ?? '',
-    };
+    // Nama jabatan diambil dari akun: mengutamakan jabatan sebenarnya yang
+    // diisi administrator, lalu jatuh ke label role. Daftar label sengaja
+    // tidak ditulis ulang di sini agar tidak ada role yang tampil mentah
+    // saat rolenya bertambah.
+    $pengguna = auth()->user();
+    $jabatan = $pengguna->label_jabatan;
+    $unitKerja = $pengguna->unit ? $pengguna->label_unit : null;
 
     $hour = now()->format('H');
     if($hour < 11){
@@ -32,10 +31,17 @@
                 <h1 class="text-3xl lg:text-4xl font-bold mb-2">
                     {{ $greeting }}, {{ auth()->user()->name ?? 'User' }} 👋
                 </h1>
-                <div class="flex items-center gap-3 text-blue-100">
-                    <span class="bg-white/20 px-3 py-1 rounded-full text-sm font-medium backdrop-blur-sm capitalize">
-                        {{ $role }}
+                <div class="flex items-center gap-3 text-blue-100 flex-wrap">
+                    <span class="bg-white/20 px-3 py-1 rounded-full text-sm font-medium backdrop-blur-sm">
+                        {{ $jabatan }}
                     </span>
+
+                    @if($unitKerja)
+                        <span class="bg-white/10 px-3 py-1 rounded-full text-sm font-medium backdrop-blur-sm">
+                            Unit {{ $unitKerja }}
+                        </span>
+                    @endif
+
                     <span class="text-sm">
                         {{ now()->translatedFormat('l, d F Y') }}
                     </span>
@@ -48,8 +54,12 @@
             <div class="hidden lg:block">
                 <div class="bg-white/10 backdrop-blur-md border border-white/20 rounded-xl px-6 py-5 shadow-inner">
                     <p class="text-xs text-blue-200 uppercase tracking-wider mb-1">Informasi Akun</p>
-                    <h2 class="text-xl font-bold">{{ auth()->user()->name ?? 'User' }}</h2>
-                    <p class="text-sm text-blue-100">{{ auth()->user()->email ?? '' }}</p>
+                    <h2 class="text-xl font-bold">{{ $pengguna->name ?? 'User' }}</h2>
+                    <p class="text-sm text-blue-100">{{ $jabatan }}</p>
+                    @if($unitKerja)
+                        <p class="text-xs text-blue-200 mt-0.5">Unit {{ $unitKerja }}</p>
+                    @endif
+                    <p class="text-xs text-blue-200 mt-1">{{ $pengguna->email ?? '' }}</p>
                 </div>
             </div>
         </div>

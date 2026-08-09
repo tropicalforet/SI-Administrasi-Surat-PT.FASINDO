@@ -20,7 +20,7 @@ function suratMasukSinkron(): SuratMasuk
 
 function penerimaBerizin(string $role = 'direktur1'): User
 {
-    $user = User::factory()->create(['role' => $role]);
+    $user = User::factory()->create(['role' => $role, 'unit' => 'teknik']);
 
     $permission = Permission::firstOrCreate(
         ['name' => 'akses_disposisi'],
@@ -46,7 +46,7 @@ function indukUntuk(User $kepada, string $status = 'menunggu'): Disposisi
 
 test('induk naik ke diproses saat disposisi diteruskan', function () {
     $direktur = penerimaBerizin();
-    $staff = User::factory()->create(['role' => 'staff']);
+    $staff = User::factory()->create(['role' => 'staff', 'unit' => 'teknik']);
 
     $induk = indukUntuk($direktur);
     expect($induk->status)->toBe('menunggu');

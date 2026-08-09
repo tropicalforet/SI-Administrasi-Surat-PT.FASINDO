@@ -48,11 +48,11 @@
                 <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
                     <div>
                         <span class="block text-xs font-semibold text-slate-500 mb-1">Nomor Surat</span>
-                        <span class="text-sm font-bold text-slate-800">{{ $disposisi->suratMasuk->nomor_surat }}</span>
+                        <span class="text-sm font-bold text-slate-800">{{ $disposisi->suratMasuk?->nomor_surat }}</span>
                     </div>
                     <div>
                         <span class="block text-xs font-semibold text-slate-500 mb-1">Perihal</span>
-                        <span class="text-sm font-medium text-slate-700">{{ $disposisi->suratMasuk->perihal }}</span>
+                        <span class="text-sm font-medium text-slate-700">{{ $disposisi->suratMasuk?->perihal }}</span>
                     </div>
                 </div>
                 
@@ -74,7 +74,7 @@
                 @csrf
                 
                 <input type="hidden" name="parent_disposisi_id" value="{{ $disposisi->id }}">
-                <input type="hidden" name="surat_masuk_id" value="{{ $disposisi->suratMasuk->id }}">
+                <input type="hidden" name="surat_masuk_id" value="{{ $disposisi->suratMasuk?->id }}">
 
                 <div class="space-y-6">
                     <div>

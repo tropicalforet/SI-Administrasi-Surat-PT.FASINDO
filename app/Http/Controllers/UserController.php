@@ -11,19 +11,27 @@ use Illuminate\Support\Facades\Hash;
 class UserController extends Controller
 {
     /**
-     * Role yang boleh disimpan. Mencegah role sembarangan masuk lewat
-     * manipulasi form, karena role menentukan hak akses di seluruh sistem.
+     * Aturan struktur organisasi. Unit wajib bagi role yang berada di dalam
+     * bagan, karena unit itulah yang membatasi jangkauan disposisi.
      */
-    private const ALLOWED_ROLES = [
-        'admin',
-        'administrator',
-        'superadmin',
-        'sekretaris',
-        'dirut',
-        'direktur1',
-        'direktur2',
-        'staff',
-    ];
+    private function aturanStruktur(): array
+    {
+        return [
+            'role'    => ['required', 'in:' . implode(',', User::ROLES)],
+            // required_if dievaluasi lebih dulu; 'nullable' hanya melewati
+            // pengecekan sisanya bila role memang tidak mewajibkan unit.
+            'unit'    => 'required_if:role,' . implode(',', User::ROLE_WAJIB_UNIT)
+                         . '|nullable|in:' . implode(',', array_keys(User::UNIT)),
+            'jabatan' => ['nullable', 'string', 'max:255'],
+        ];
+    }
+
+    private function pesanStruktur(): array
+    {
+        return [
+            'unit.required_if' => 'Unit kerja wajib dipilih untuk role Direktur, Manager, dan Pelaksana.',
+        ];
+    }
 
     /**
      * Tampilkan daftar pengguna.
@@ -65,14 +73,15 @@ class UserController extends Controller
             'name'     => 'required|string|max:255',
             'email'    => 'required|email|unique:users,email',
             'password' => 'required|min:6',
-            'role'     => ['required', 'in:' . implode(',', self::ALLOWED_ROLES)],
-        ]);
+        ] + $this->aturanStruktur(), $this->pesanStruktur());
 
         $user = User::create([
             'name'     => $validated['name'],
             'email'    => $validated['email'],
             'password' => Hash::make($validated['password']),
             'role'     => $validated['role'],
+            'unit'     => $validated['unit'] ?? null,
+            'jabatan'  => $validated['jabatan'] ?? null,
         ]);
 
         // Sync permissions (jika ada)
@@ -103,8 +112,7 @@ class UserController extends Controller
         $validated = $request->validate([
             'name'  => 'required|string|max:255',
             'email' => 'required|email|unique:users,email,' . $user->id,
-            'role'  => ['required', 'in:' . implode(',', self::ALLOWED_ROLES)],
-        ]);
+        ] + $this->aturanStruktur(), $this->pesanStruktur());
 
         // PROTEKSI: Mencegah admin mengubah role akunnya sendiri, karena
         // menurunkan role sendiri akan menghilangkan akses ke halaman ini
@@ -117,6 +125,8 @@ class UserController extends Controller
             'name'  => $validated['name'],
             'email' => $validated['email'],
             'role'  => $validated['role'],
+            'unit'  => $validated['unit'] ?? null,
+            'jabatan' => $validated['jabatan'] ?? null,
         ];
 
         // Password hanya diubah jika field tidak kosong

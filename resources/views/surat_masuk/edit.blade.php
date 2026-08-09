@@ -139,25 +139,19 @@
                     @enderror
                 </div>
 
+                <!-- Sifat & Jalur Penerimaan -->
+                @include('surat_masuk.partials.sifat-jalur', [
+                    'sifat' => old('sifat', $surat_masuk->sifat),
+                    'jalur' => old('jalur_penerimaan', $surat_masuk->jalur_penerimaan),
+                ])
+
                 <!-- Penerima -->
-                <div>
-                    <label class="block text-sm font-semibold text-slate-700 mb-2">
-                        Penerima (Tujuan Surat)
-                    </label>
-                    <select name="penerima_id"
-                            required
-                            class="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 focus:bg-white outline-none transition-all text-slate-800 @error('penerima_id') border-red-500 focus:ring-red-500 @enderror">
-                        <option value="" disabled>Pilih Penerima</option>
-                        @foreach($users as $user)
-                            <option value="{{ $user->id }}" {{ old('penerima_id', $surat_masuk->penerima_id) == $user->id ? 'selected' : '' }}>
-                                {{ $user->name }} ({{ ucfirst($user->role) }})
-                            </option>
-                        @endforeach
-                    </select>
-                    @error('penerima_id')
-                        <p class="text-red-500 text-xs mt-1.5">{{ $message }}</p>
-                    @enderror
-                </div>
+                @include('surat_masuk.partials.penerima', [
+                    'users'         => $users,
+                    'penerimaTipe'  => old('penerima_tipe', $surat_masuk->penerima_role ? 'role' : 'user'),
+                    'penerimaId'    => old('penerima_id', $surat_masuk->penerima_id),
+                    'penerimaRole'  => old('penerima_role', $surat_masuk->penerima_role),
+                ])
 
                 <!-- Perihal -->
                 <div>

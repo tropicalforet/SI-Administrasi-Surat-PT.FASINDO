@@ -12,7 +12,6 @@ use App\Http\Controllers\SuratKeluarController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\ActivityLogController;
 use App\Http\Controllers\ProfileController;
-use App\Http\Controllers\SuratTugasController;
 use App\Http\Controllers\NotifikasiController;
 
 
@@ -88,7 +87,14 @@ Route::delete(
     |--------------------------------------------------------------------------
     */
     Route::get('/surat-masuk', [SuratMasukController::class, 'index'])->name('surat-masuk.index');
-    
+
+    // Detail dapat dibuka siapa pun yang berhak membaca suratnya; pembatasan
+    // sebenarnya ada di controller, bukan pada permission input surat.
+    Route::get('/surat-masuk/{surat_masuk}', [SuratMasukController::class, 'show'])
+        ->whereNumber('surat_masuk')
+        ->name('surat-masuk.show');
+
+
     Route::middleware('permission:akses_surat_masuk')->group(function () {
         Route::get('/surat-masuk/create', [SuratMasukController::class, 'create'])->name('surat-masuk.create');
         Route::post('/surat-masuk', [SuratMasukController::class, 'store'])->name('surat-masuk.store');
@@ -122,6 +128,11 @@ Route::delete(
         )->name('surat-keluar.submit');
 
         Route::put(
+            '/surat-keluar/{surat_keluar}/verifikasi',
+            [SuratKeluarController::class, 'verifikasi']
+        )->name('surat-keluar.verifikasi');
+
+        Route::put(
             '/surat-keluar/{surat_keluar}/approve',
             [SuratKeluarController::class, 'approve']
         )->name('surat-keluar.approve');
@@ -139,17 +150,22 @@ Route::delete(
 
     /*
     |--------------------------------------------------------------------------
-    | SKPD & Surat Tugas
+    | SKPD (Penugasan & Perjalanan Dinas)
     |--------------------------------------------------------------------------
     */
     Route::middleware('permission:akses_skpd')->group(function () {
-        Route::resource('surat-tugas', SuratTugasController::class);
-        Route::put('/surat-tugas/{surat_tugas}/approve', [SuratTugasController::class, 'approve'])->name('surat-tugas.approve');
-
+        /*
+        | Surat Tugas dipensiunkan: isinya hampir seluruhnya sama dengan SKPD
+        | dan keduanya disetujui Direktur Utama. Alurnya kini menyatu di SKPD,
+        | yang mencakup perjalanan dinas maupun penugasan internal.
+        */
         Route::resource(
             'skpd',
             SkpdController::class
         );
+
+        Route::put('/skpd/{skpd}/ajukan', [SkpdController::class, 'ajukan'])->name('skpd.ajukan');
+        Route::put('/skpd/{skpd}/setujui-direktur', [SkpdController::class, 'setujuiDirektur'])->name('skpd.setujui-direktur');
 
         Route::get(
             '/skpd/{skpd}/download-pdf',
@@ -166,10 +182,12 @@ Route::delete(
             [SkpdController::class, 'approve']
         )->name('skpd.approve')->middleware(['role:dirut']);
 
+        // Penolakan dapat dilakukan direktur unit maupun Dirut, sesuai tahapnya;
+        // pembatasannya ada di controller, bukan lagi middleware role tunggal.
         Route::put(
             '/skpd/{skpd}/reject',
             [SkpdController::class, 'reject']
-        )->name('skpd.reject')->middleware(['role:dirut']);
+        )->name('skpd.reject');
     });
 
     /*

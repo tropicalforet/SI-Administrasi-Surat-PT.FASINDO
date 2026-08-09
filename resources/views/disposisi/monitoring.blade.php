@@ -42,7 +42,7 @@
             <div>
                 <div class="flex justify-between items-start mb-3 gap-4">
                     <h2 class="font-bold text-lg text-blue-700 leading-tight">
-                        {{ $item->suratMasuk->nomor_surat }}
+                        {{ $item->suratMasuk?->nomor_surat }}
                     </h2>
                     
                     <div>
@@ -62,8 +62,8 @@
                     </div>
                 </div>
 
-                <p class="text-slate-600 text-sm leading-relaxed line-clamp-2 mb-4" title="{{ $item->suratMasuk->perihal }}">
-                    {{ $item->suratMasuk->perihal }}
+                <p class="text-slate-600 text-sm leading-relaxed line-clamp-2 mb-4" title="{{ $item->suratMasuk?->perihal }}">
+                    {{ $item->suratMasuk?->perihal }}
                 </p>
             </div>
 

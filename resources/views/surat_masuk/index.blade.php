@@ -97,6 +97,7 @@
                         <th class="py-4 px-6 font-semibold">Pengirim</th>
                         <th class="py-4 px-6 font-semibold">Penerima</th>
                         <th class="py-4 px-6 font-semibold">Perihal</th>
+                        <th class="py-4 px-6 font-semibold text-center">Status</th>
                         <th class="py-4 px-6 font-semibold text-center">File</th>
                         <th class="py-4 px-6 font-semibold text-center w-64">Aksi</th>
                     </tr>
@@ -111,7 +112,11 @@
                         </td>
 
                         <td class="py-4 px-6 font-semibold text-slate-800">
-                            {{ $item->nomor_surat }}
+                            <a href="{{ route('surat-masuk.show', $item->id) }}"
+                               class="font-semibold text-blue-600 hover:text-blue-800 hover:underline">
+                                {{ $item->nomor_surat }}
+                            </a>
+                            @include('surat_masuk.partials.badge-sifat', ['surat' => $item])
                         </td>
 
                         <td class="py-4 px-6 text-slate-600">
@@ -135,16 +140,26 @@
 
                         <td class="py-4 px-6">
                             {{ $item->pengirim }}
+                            @if($item->jalur_penerimaan)
+                                <span class="block text-xs text-slate-400 mt-0.5">via {{ $item->label_jalur }}</span>
+                            @endif
                         </td>
 
                         <td class="py-4 px-6">
-                            {{ $item->penerimaUser ? $item->penerimaUser->name . ' (' . ucfirst($item->penerimaUser->role) . ')' : $item->penerima }}
+                            {{ $item->label_penerima }}
+                            @if($item->penerima_role)
+                                <span class="ml-1 text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full bg-indigo-100 text-indigo-700">Role</span>
+                            @endif
                         </td>
 
                         <td class="py-4 px-6">
                             <span class="line-clamp-2" title="{{ $item->perihal }}">
                                 {{ $item->perihal }}
                             </span>
+                        </td>
+
+                        <td class="py-4 px-6 text-center">
+                            @include('surat_masuk.partials.badge-status', ['surat' => $item])
                         </td>
 
                         <td class="py-4 px-6 text-center">
@@ -201,7 +216,7 @@
 
                     @if($data->isEmpty())
                     <tr>
-                        <td colspan="8" class="py-12 px-6 text-center">
+                        <td colspan="9" class="py-12 px-6 text-center">
                             <div class="flex flex-col items-center justify-center text-slate-400">
                                 <svg class="w-12 h-12 mb-3 text-slate-300" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path></svg>
                                 <p class="text-slate-500 font-medium">Belum ada data surat masuk.</p>

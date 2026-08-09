@@ -7,26 +7,40 @@
         <div class="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden">
             
             <div class="p-6 border-b border-slate-100 flex flex-col md:flex-row justify-between items-center gap-4 bg-white">
+                @php
+                    $peran = strtolower(auth()->user()->role);
+                    $atasan = in_array($peran, ['dirut', 'direktur1', 'direktur2', 'sekretaris']);
+                @endphp
+
                 <div>
                     <h2 class="text-2xl font-bold text-slate-800">
-                        @if(strtolower(auth()->user()->role) == 'sekretaris')
+                        @if($peran === 'sekretaris')
                             Data SKPD
-                        @elseif(in_array(strtolower(auth()->user()->role), ['dirut', 'direktur1']))
+                        @elseif(in_array($peran, ['dirut', 'direktur1', 'direktur2']))
                             Persetujuan SKPD
                         @else
                             SKPD Saya
                         @endif
                     </h2>
                     <p class="text-sm text-slate-500 mt-1">
-                        @if(strtolower(auth()->user()->role) == 'sekretaris')
-                            Kelola dan verifikasi Surat Keterangan Perjalanan Dinas (SKPD) pegawai.
-                        @elseif(in_array(strtolower(auth()->user()->role), ['dirut', 'direktur1']))
-                            Setujui atau tolak pengajuan Surat Keterangan Perjalanan Dinas (SKPD) pegawai, dan kelola pengajuan SKPD Anda sendiri.
+                        @if($peran === 'sekretaris')
+                            Kelola penugasan pegawai, baik perjalanan dinas maupun tugas internal.
+                        @elseif(in_array($peran, ['dirut', 'direktur1', 'direktur2']))
+                            Setujui atau tolak penugasan pegawai, sekaligus kelola penugasan Anda sendiri.
                         @else
-                            Daftar pengajuan Surat Keterangan Perjalanan Dinas (SKPD) Anda.
+                            Penugasan Anda, baik perjalanan dinas maupun tugas internal.
+                            Ajukan usulan bila Anda melihat kebutuhannya.
                         @endif
                     </p>
                 </div>
+
+                {{-- Pintu masuk pembuatan. Sebelumnya tidak ada karena SKPD hanya
+                     bisa lahir dari Surat Tugas; kini SKPD berdiri sendiri. --}}
+                <a href="{{ route('skpd.create') }}"
+                   class="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white font-medium py-2.5 px-5 rounded-xl transition duration-200 shadow-md shadow-blue-500/20 whitespace-nowrap">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path></svg>
+                    {{ $atasan ? 'Buat Penugasan' : 'Ajukan Penugasan' }}
+                </a>
 
             </div>
 
@@ -36,7 +50,7 @@
                         <tr class="bg-slate-50 text-slate-500 text-xs uppercase tracking-wider border-b border-slate-200">
                             <th class="py-4 px-6 font-semibold w-16">No</th>
                             <th class="py-4 px-6 font-semibold">No. SKPD</th>
-                            <th class="py-4 px-6 font-semibold">No. Surat Tugas</th>
+                            <th class="py-4 px-6 font-semibold">Jenis</th>
                             @if(in_array(strtolower(auth()->user()->role), ['sekretaris', 'dirut']))
                                 <th class="py-4 px-6 font-semibold">Diajukan Oleh</th>
                             @endif
@@ -61,7 +75,10 @@
                             </td>
 
                             <td class="py-4 px-6 text-slate-500">
-                                {{ $item->suratTugas->nomor_surat_tugas ?? '-' }}
+                                {{ $item->label_jenis }}
+                                @if($item->asal_usul === 'usulan')
+                                    <span class="block text-[10px] font-bold uppercase tracking-wider text-slate-400 mt-0.5">Usulan</span>
+                                @endif
                             </td>
 
                             @if(in_array(strtolower(auth()->user()->role), ['sekretaris', 'dirut']))
@@ -76,7 +93,7 @@
 
                             <td class="py-4 px-6">
                                 <span class="line-clamp-2" title="{{ $item->tujuan_dinas }}">
-                                    {{ $item->tujuan_dinas }}
+                                    {{ $item->berupaPerjalanan() ? $item->tujuan_dinas : '—' }}
                                 </span>
                             </td>
 
@@ -88,27 +105,21 @@
                             </td>
 
                             <td class="py-4 px-6 text-center">
-                                @if(strtolower($item->status) == 'pengajuan')
-                                    <span class="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold bg-blue-50 text-blue-700 border border-blue-200">
-                                        Pengajuan
-                                    </span>
-                                @elseif(strtolower($item->status) == 'diperiksa')
-                                    <span class="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold bg-yellow-50 text-yellow-700 border border-yellow-200">
-                                        Perlu Approval Dirut
-                                    </span>
-                                @elseif(strtolower($item->status) == 'disetujui')
-                                    <span class="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200">
-                                        Disetujui
-                                    </span>
-                                @elseif(strtolower($item->status) == 'ditolak')
-                                    <span class="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold bg-red-50 text-red-700 border border-red-200" title="{{ $item->catatan_revisi }}">
-                                        Revisi/Ditolak
-                                    </span>
-                                @else
-                                    <span class="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold bg-slate-50 text-slate-700 border border-slate-200">
-                                        {{ ucfirst($item->status) }}
-                                    </span>
-                                @endif
+                                @php
+                                    // Label diambil dari Skpd::STATUS agar tidak ada
+                                    // status yang tampil kosong saat alurnya bertambah.
+                                    $warnaStatus = match($item->status) {
+                                        'disetujui'         => 'bg-emerald-50 text-emerald-700 border-emerald-200',
+                                        'menunggu_direktur' => 'bg-orange-50 text-orange-700 border-orange-200',
+                                        'menunggu_dirut'    => 'bg-blue-50 text-blue-700 border-blue-200',
+                                        'ditolak'           => 'bg-red-50 text-red-700 border-red-200',
+                                        default             => 'bg-yellow-50 text-yellow-700 border-yellow-200',
+                                    };
+                                @endphp
+                                <span class="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold border {{ $warnaStatus }}"
+                                      title="{{ $item->status === 'ditolak' ? $item->catatan_revisi : '' }}">
+                                    {{ $item->label_status }}
+                                </span>
                             </td>
 
                             <td class="py-4 px-6">
@@ -123,7 +134,7 @@
                                     @php
                                         $role = strtolower(auth()->user()->role);
                                         $isOwner = ($item->user_id ?? null) === auth()->id();
-                                        $canEdit = ($role === 'sekretaris' || ($isOwner && in_array(strtolower($item->status), ['pengajuan', 'ditolak'])));
+                                        $canEdit = ($role === 'sekretaris' || ($isOwner && in_array($item->status, ['draft', 'ditolak'])));
                                         $canDelete = ($role === 'sekretaris' || $isOwner);
                                     @endphp
 

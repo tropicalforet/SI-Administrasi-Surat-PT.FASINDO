@@ -15,18 +15,64 @@ class DisposisiController extends Controller
 {
     public function create(SuratMasuk $suratMasuk)
     {
-        $role = auth()->user()->role;
-        if ($role == 'dirut') {
-            $users = User::whereIn('role', ['direktur1', 'direktur2', 'sekretaris'])->get();
-        } elseif ($role == 'sekretaris') {
-            $users = User::whereIn('role', ['dirut', 'direktur1', 'direktur2'])->get();
-        } elseif ($role == 'direktur1' || $role == 'direktur2') {
-            $users = User::where('role', 'staff')->get();
-        } else {
-            abort(403, 'Anda tidak memiliki akses untuk membuat disposisi.');
+        $users = $this->tujuanDisposisi(auth()->user());
+
+        if ($users->isEmpty() && !in_array(strtolower(auth()->user()->role), ['dirut', 'sekretaris'])) {
+            return back()->with('error', $this->alasanTujuanKosong(auth()->user()));
         }
 
         return view('disposisi.create', compact('suratMasuk', 'users'));
+    }
+
+    /**
+     * Daftar orang yang boleh dituju seorang pengguna saat mendisposisikan.
+     *
+     * Dirut dan sekretaris berada di pimpinan sehingga menjangkau lintas
+     * direktorat. Direktur dan manager hanya menjangkau bawahannya dalam
+     * satu unit kerja, agar disposisi tidak menyeberang garis komando.
+     */
+    private function tujuanDisposisi(User $user)
+    {
+        return match (strtolower($user->role)) {
+            'dirut'      => User::whereIn('role', ['direktur1', 'direktur2', 'sekretaris'])
+                                ->orderBy('role')->orderBy('name')->get(),
+            'sekretaris' => User::whereIn('role', ['dirut', 'direktur1', 'direktur2'])
+                                ->orderBy('role')->orderBy('name')->get(),
+            default      => $user->bawahanSeunit(),
+        };
+    }
+
+    /**
+     * Pastikan tujuan disposisi memang berada dalam jangkauan pengirim.
+     * Tanpa ini, daftar tujuan di formulir hanya pembatas tampilan dan masih
+     * bisa dilewati dengan mengirim id pengguna lain lewat POST.
+     */
+    private function aturanTujuanSah(): callable
+    {
+        $diizinkan = $this->tujuanDisposisi(auth()->user())->pluck('id');
+
+        return function ($attribute, $value, $fail) use ($diizinkan) {
+            if (!$diizinkan->contains((int) $value)) {
+                $fail('Pegawai yang dipilih berada di luar jangkauan disposisi Anda.');
+            }
+        };
+    }
+
+    /**
+     * Pesan yang menjelaskan mengapa tidak ada tujuan yang tersedia, supaya
+     * pengguna tahu apa yang harus dibereskan alih-alih melihat daftar kosong.
+     */
+    private function alasanTujuanKosong(User $user): string
+    {
+        if (empty($user->rolesBawahan())) {
+            return 'Anda tidak memiliki akses untuk membuat disposisi.';
+        }
+
+        if (!$user->unit) {
+            return 'Unit kerja akun Anda belum ditetapkan. Hubungi administrator agar disposisi dapat diteruskan.';
+        }
+
+        return 'Belum ada pegawai di unit ' . $user->label_unit . ' yang dapat dituju. Hubungi administrator untuk menetapkan unit kerja pegawai.';
     }
 
     public function store(Request $request)
@@ -34,7 +80,7 @@ class DisposisiController extends Controller
         $request->validate([
             'surat_masuk_id' => 'required|exists:surat_masuks,id',
             'kepada_user_id' => 'required|array|min:1',
-            'kepada_user_id.*' => 'exists:users,id',
+            'kepada_user_id.*' => ['exists:users,id', $this->aturanTujuanSah()],
             'instruksi'      => 'required|string',
             'batas_waktu'    => 'nullable|date|after_or_equal:today',
         ]);
@@ -56,9 +102,11 @@ class DisposisiController extends Controller
 
                 ActivityHelper::log(
                     'Membuat Disposisi',
-                    'Mendisposisikan surat ' . $disposisi->suratMasuk->nomor_surat . ' kepada ' . $disposisi->kepadaUser->name
+                    'Mendisposisikan surat ' . ($disposisi->suratMasuk?->nomor_surat ?? '-') . ' kepada ' . $disposisi->kepadaUser->name
                 );
             }
+
+            SuratMasuk::find($request->surat_masuk_id)?->segarkanStatus();
         });
 
         return redirect()
@@ -134,10 +182,12 @@ class DisposisiController extends Controller
 
             ActivityHelper::log(
                 'Update Disposisi',
-                auth()->user()->name . ' mengubah status disposisi surat ' . $disposisi->suratMasuk->nomor_surat . ' menjadi ' . ucfirst($request->status)
+                auth()->user()->name . ' mengubah status disposisi surat ' . ($disposisi->suratMasuk?->nomor_surat ?? '-') . ' menjadi ' . ucfirst($request->status)
             );
 
             $this->sinkronkanInduk($disposisi);
+
+            $disposisi->suratMasuk?->segarkanStatus();
         });
 
         return redirect()
@@ -221,15 +271,13 @@ class DisposisiController extends Controller
             abort(403, 'Akses ditolak. Anda tidak berhak meneruskan disposisi ini.');
         }
 
-        $role = auth()->user()->role;
-        if ($role == 'dirut') {
-            $users = User::whereIn('role', ['direktur1', 'direktur2', 'sekretaris'])->get();
-        } elseif ($role == 'sekretaris') {
-            $users = User::whereIn('role', ['dirut', 'direktur1', 'direktur2'])->get();
-        } elseif ($role == 'direktur1' || $role == 'direktur2') {
-            $users = User::where('role', 'staff')->get();
-        } else {
-            $users = User::where('role', 'staff')->get(); // Default fallback
+        // Aturan tujuan sama dengan saat membuat disposisi baru. Fallback lama
+        // yang mengembalikan seluruh pegawai dihapus karena justru membuka
+        // penerusan ke luar unit.
+        $users = $this->tujuanDisposisi(auth()->user());
+
+        if ($users->isEmpty()) {
+            return back()->with('error', $this->alasanTujuanKosong(auth()->user()));
         }
 
         return view('disposisi.continue', compact('disposisi', 'users'));
@@ -240,7 +288,7 @@ class DisposisiController extends Controller
         $request->validate([
             'parent_disposisi_id' => 'required|exists:disposisis,id',
             'kepada_user_id'      => 'required|array|min:1',
-            'kepada_user_id.*'    => 'exists:users,id',
+            'kepada_user_id.*'    => ['exists:users,id', $this->aturanTujuanSah()],
             'instruksi'           => 'required|string',
             'batas_waktu'         => 'nullable|date|after_or_equal:today',
         ]);
@@ -272,7 +320,7 @@ class DisposisiController extends Controller
 
                 ActivityHelper::log(
                     'Teruskan Disposisi',
-                    auth()->user()->name . ' meneruskan disposisi surat ' . $child->suratMasuk->nomor_surat . ' kepada ' . $child->kepadaUser->name
+                    auth()->user()->name . ' meneruskan disposisi surat ' . ($child->suratMasuk?->nomor_surat ?? '-') . ' kepada ' . $child->kepadaUser->name
                 );
             }
 
@@ -280,6 +328,8 @@ class DisposisiController extends Controller
             if ($parent->status === 'menunggu') {
                 $parent->update(['status' => 'diproses']);
             }
+
+            $parent->suratMasuk?->segarkanStatus();
         });
 
         return redirect()
@@ -299,8 +349,13 @@ class DisposisiController extends Controller
         }
 
         ActivityHelper::log('Hapus Disposisi', 'Menghapus disposisi ID ' . $disposisi->id);
-        
+
+        $suratMasuk = $disposisi->suratMasuk;
+
         $disposisi->delete();
+
+        // Surat bisa kembali berstatus 'baru' bila disposisi terakhirnya dibatalkan.
+        $suratMasuk?->segarkanStatus();
 
         return back()->with('success', 'Disposisi berhasil dihapus.');
     }

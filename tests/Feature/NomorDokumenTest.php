@@ -44,20 +44,22 @@ test('nomor melanjutkan dari counter yang sudah terisi', function () {
     expect(NomorDokumenHelper::next('skpd', 2026))->toBe(32);
 });
 
-test('nomor surat tugas tidak terulang setelah data dihapus', function () {
-    $sekretaris = User::factory()->create(['role' => 'sekretaris']);
-    $pegawai = User::factory()->create(['role' => 'staff']);
+test('nomor skpd tidak terulang setelah data dihapus', function () {
+    $sekretaris = User::factory()->create(['role' => 'sekretaris', 'unit' => 'pimpinan']);
+    $pegawai = User::factory()->create(['role' => 'staff', 'unit' => 'teknik']);
 
     $buat = function () use ($sekretaris, $pegawai) {
-        $this->actingAs($sekretaris)->post('/surat-tugas', [
-            'user_id'         => $pegawai->id,
-            'perihal_tugas'   => 'Kunjungan kerja',
-            'tujuan'          => 'Surabaya',
-            'tanggal_mulai'   => '2026-09-01',
-            'tanggal_selesai' => '2026-09-03',
+        $this->actingAs($sekretaris)->post('/skpd', [
+            'user_id'           => $pegawai->id,
+            'jenis'             => 'perjalanan_dinas',
+            'keperluan'         => 'Kunjungan kerja',
+            'tujuan_dinas'      => 'Surabaya',
+            'tanggal_berangkat' => '2026-09-01',
+            'tanggal_kembali'   => '2026-09-03',
+            'aksi'              => 'draft',
         ]);
 
-        return SuratTugas::latest('id')->first();
+        return App\Models\Skpd::latest('id')->first();
     };
 
     $pertama = $buat();
@@ -65,14 +67,14 @@ test('nomor surat tugas tidak terulang setelah data dihapus', function () {
 
     // Skema lama memakai max(id)+1, sehingga menghapus data terakhir
     // membuat nomor berikutnya mengulang nomor yang sudah dipakai.
-    $this->actingAs($sekretaris)->delete('/surat-tugas/' . $kedua->id);
+    $this->actingAs($sekretaris)->delete('/skpd/' . $kedua->id);
 
     $ketiga = $buat();
 
     $semua = [
-        $pertama->nomor_surat_tugas,
-        $kedua->nomor_surat_tugas,
-        $ketiga->nomor_surat_tugas,
+        $pertama->nomor_skpd,
+        $kedua->nomor_skpd,
+        $ketiga->nomor_skpd,
     ];
 
     expect(array_unique($semua))->toHaveCount(3);

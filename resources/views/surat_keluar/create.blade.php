@@ -97,6 +97,8 @@
                     @enderror
                 </div>
 
+                @include('surat_keluar.partials.unit-verifikasi', ['unitVerifikasi' => old('unit_verifikasi')])
+
                 <div>
                     <label class="block text-sm font-semibold text-slate-700 mb-2">
                         Tujuan (Kepada)

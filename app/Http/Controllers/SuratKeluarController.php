@@ -5,6 +5,8 @@ namespace App\Http\Controllers;
 use App\Models\SuratKeluar;
 use App\Helpers\ActivityHelper;
 use App\Helpers\NomorDokumenHelper;
+use App\Notifications\SuratKeluarMenungguTindakan;
+use App\Notifications\SuratKeluarDiputuskan;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
 
@@ -63,6 +65,7 @@ class SuratKeluarController extends Controller
             'kategori_surat' => 'required|string',
             'kategori_surat_lainnya' => 'required_if:kategori_surat,Lainnya|string|nullable',
             'tanggal_surat'  => 'required|date',
+            'unit_verifikasi' => 'required|in:' . implode(',', array_keys(\App\Models\User::UNIT)),
             'tujuan'         => 'required|string',
             'perihal'        => 'required|string',
             'file'           => 'nullable|mimes:pdf,jpg,jpeg,png,doc,docx|max:5120',
@@ -108,6 +111,7 @@ class SuratKeluarController extends Controller
         $suratKeluar = SuratKeluar::create([
             'nomor_surat'    => $nomor_surat,
             'kategori_surat' => $kategori,
+            'unit_verifikasi' => $validated['unit_verifikasi'],
             'tanggal_surat'  => $validated['tanggal_surat'],
             'tujuan'         => $request->tujuan,
             'perihal'        => $request->perihal,
@@ -142,6 +146,7 @@ class SuratKeluarController extends Controller
 
         $request->validate([
             'tanggal_surat' => 'required|date',
+            'unit_verifikasi' => 'required|in:' . implode(',', array_keys(\App\Models\User::UNIT)),
             'tujuan'        => 'required|string',
             'perihal'       => 'required|string',
             'file'          => 'nullable|mimes:pdf,jpg,jpeg,png,docx|max:5120',
@@ -167,6 +172,7 @@ class SuratKeluarController extends Controller
         }
 
         $surat_keluar->update([
+            'unit_verifikasi' => $request->unit_verifikasi,
             'tanggal_surat' => $request->tanggal_surat,
             'tujuan'        => $request->tujuan,
             'perihal'       => $request->perihal,
@@ -188,19 +194,81 @@ class SuratKeluarController extends Controller
             return back()->with('error', 'Surat ini sudah diajukan atau sudah disetujui.');
         }
 
+        $pemaraf = $surat_keluar->direkturVerifikator();
+
+        if (!$pemaraf) {
+            return back()->with('error', 'Belum ada direktur pada unit ' . $surat_keluar->label_unit_verifikasi . '. Hubungi administrator sebelum mengajukan surat ini.');
+        }
+
         $diajukanUlang = $surat_keluar->status === 'ditolak';
 
+        // Verifikasi direktur terkait mendahului persetujuan Direktur Utama.
+        // Verifikasi lama dikosongkan agar pengajuan ulang diperiksa dari awal.
         $surat_keluar->update([
-            'status'         => 'menunggu_dirut',
-            'catatan_revisi' => null,
+            'status'               => 'menunggu_direktur',
+            'catatan_revisi'       => null,
+            'approved_direktur_by' => null,
+            'approved_direktur_at' => null,
         ]);
+
+        $pemaraf->notify(new SuratKeluarMenungguTindakan($surat_keluar, 'verifikasi'));
 
         ActivityHelper::log(
             $diajukanUlang ? 'Ajukan Ulang Persetujuan' : 'Ajukan Persetujuan',
-            'Mengajukan surat ' . $surat_keluar->nomor_surat . ' untuk persetujuan Direktur Utama'
+            'Mengajukan surat ' . $surat_keluar->nomor_surat . ' untuk verifikasi ' . $pemaraf->label_jabatan
         );
 
-        return redirect()->route('surat-keluar.index')->with('success', 'Surat berhasil diajukan untuk persetujuan.');
+        return redirect()->route('surat-keluar.index')->with('success', 'Surat diajukan untuk verifikasi ' . $pemaraf->label_jabatan . '.');
+    }
+
+    /**
+     * Verifikasi direktur terkait. Tahap ini memastikan surat sudah diperiksa
+     * pejabat bidangnya sebelum sampai ke meja Direktur Utama.
+     */
+    public function verifikasi(SuratKeluar $surat_keluar)
+    {
+        $user = auth()->user();
+
+        if (!$user->isDirektur()) {
+            abort(403, 'Akses ditolak. Hanya Direktur yang dapat memverifikasi surat keluar.');
+        }
+
+        if ($surat_keluar->status !== 'menunggu_direktur') {
+            return back()->with('error', 'Surat ini tidak sedang menunggu verifikasi.');
+        }
+
+        // Direktur hanya memverifikasi surat pada unitnya sendiri, mengikuti
+        // pembagian direktorat pada bagan organisasi.
+        if ($surat_keluar->unit_verifikasi !== $user->unit) {
+            abort(403, 'Akses ditolak. Surat ini bukan kewenangan direktorat Anda.');
+        }
+
+        $surat_keluar->update([
+            'status'               => 'menunggu_dirut',
+            'approved_direktur_by' => $user->id,
+            'approved_direktur_at' => now(),
+        ]);
+
+        $this->beritahuDirut($surat_keluar);
+        $this->beritahuSekretaris($surat_keluar, 'diverifikasi', $user->name);
+
+        ActivityHelper::log('Verifikasi Surat Keluar', $user->name . ' memverifikasi surat ' . $surat_keluar->nomor_surat);
+
+        return back()->with('success', 'Surat berhasil diverifikasi dan diteruskan ke Direktur Utama.');
+    }
+
+    private function beritahuDirut(SuratKeluar $surat_keluar): void
+    {
+        foreach (\App\Models\User::where('role', 'dirut')->get() as $dirut) {
+            $dirut->notify(new SuratKeluarMenungguTindakan($surat_keluar, 'persetujuan'));
+        }
+    }
+
+    private function beritahuSekretaris(SuratKeluar $surat_keluar, string $keputusan, ?string $oleh = null): void
+    {
+        foreach (\App\Models\User::where('role', 'sekretaris')->get() as $sekretaris) {
+            $sekretaris->notify(new SuratKeluarDiputuskan($surat_keluar, $keputusan, $oleh));
+        }
     }
 
     public function approve(SuratKeluar $surat_keluar)
@@ -283,6 +351,8 @@ class SuratKeluarController extends Controller
                 'approved_dirut_at' => now()
             ]);
 
+            $this->beritahuSekretaris($surat_keluar, 'disetujui', $user->name);
+
             ActivityHelper::log('Approval Surat', 'Direktur Utama menyetujui surat ' . $surat_keluar->nomor_surat);
             return back()->with('success', 'Surat berhasil disetujui & E-Sign disematkan ke dalam dokumen.');
         }
@@ -292,8 +362,22 @@ class SuratKeluarController extends Controller
 
     public function reject(Request $request, SuratKeluar $surat_keluar)
     {
-        if (strtolower(auth()->user()->role) !== 'dirut') {
-            abort(403, 'Hanya Direktur Utama yang dapat menolak/merevisi Surat Keluar.');
+        $user = auth()->user();
+        $role = strtolower($user->role);
+
+        // Surat dapat dikembalikan di dua titik: saat menunggu verifikasi direktur
+        // bidangnya, dan saat menunggu persetujuan Direktur Utama.
+        if ($role === 'dirut') {
+            $bolehMenolak = $surat_keluar->status === 'menunggu_dirut';
+        } elseif ($user->isDirektur()) {
+            $bolehMenolak = $surat_keluar->status === 'menunggu_direktur'
+                && $surat_keluar->unit_verifikasi === $user->unit;
+        } else {
+            abort(403, 'Hanya Direktur atau Direktur Utama yang dapat menolak Surat Keluar.');
+        }
+
+        if (!$bolehMenolak) {
+            abort(403, 'Surat ini tidak sedang menunggu keputusan Anda.');
         }
 
         $request->validate([
@@ -304,6 +388,8 @@ class SuratKeluarController extends Controller
             'status'         => 'ditolak',
             'catatan_revisi' => $request->catatan_revisi
         ]);
+
+        $this->beritahuSekretaris($surat_keluar, 'ditolak', $user->name);
 
         ActivityHelper::log('Reject Surat Keluar', 'Menolak Surat Keluar nomor ' . $surat_keluar->nomor_surat . ' dengan alasan: ' . $request->catatan_revisi);
 

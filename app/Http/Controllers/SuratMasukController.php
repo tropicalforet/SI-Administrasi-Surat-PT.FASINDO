@@ -3,7 +3,9 @@
 namespace App\Http\Controllers;
 
 use App\Models\SuratMasuk;
+use App\Models\User;
 use App\Helpers\ActivityHelper;
+use App\Notifications\SuratMasukDiterima;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage; // Tambahkan ini untuk manajemen file
 
@@ -16,12 +18,7 @@ class SuratMasukController extends Controller
         // Filter Hak Akses
         $user = auth()->user();
         if (!in_array(strtolower($user->role), ['admin', 'administrator', 'superadmin', 'dirut', 'sekretaris'])) {
-            $query->where(function($q) use ($user) {
-                $q->where('penerima_id', $user->id)
-                  ->orWhereHas('disposisis', function($sq) use ($user) {
-                      $sq->where('kepada_user_id', $user->id);
-                  });
-            });
+            $query->dapatDibacaOleh($user);
         }
 
         // Pencarian Dinamis
@@ -80,6 +77,39 @@ class SuratMasukController extends Controller
         ];
     }
 
+    /**
+     * Aturan tujuan surat: dapat ditujukan ke satu pengguna, atau ke sebuah
+     * role sehingga seluruh pemegang role itu berhak membacanya.
+     */
+    private function aturanPenerima(): array
+    {
+        return [
+            'penerima_tipe'  => 'required|in:user,role',
+            'penerima_id'    => 'required_if:penerima_tipe,user|nullable|exists:users,id',
+            'penerima_role'  => 'required_if:penerima_tipe,role|nullable|in:' . implode(',', array_keys(User::ROLE_PENERIMA_SURAT)),
+        ];
+    }
+
+    /**
+     * Susun kolom penerima sesuai tipe tujuan yang dipilih.
+     */
+    private function dataPenerima(Request $request): array
+    {
+        if ($request->penerima_tipe === 'role') {
+            return [
+                'penerima_id'   => null,
+                'penerima_role' => $request->penerima_role,
+                'penerima'      => User::ROLE_PENERIMA_SURAT[$request->penerima_role],
+            ];
+        }
+
+        return [
+            'penerima_id'   => $request->penerima_id,
+            'penerima_role' => null,
+            'penerima'      => User::find($request->penerima_id)->name,
+        ];
+    }
+
     public function create()
     {
         abort_unless(auth()->user()->role === 'sekretaris', 403, 'Akses ditolak.');
@@ -97,10 +127,11 @@ class SuratMasukController extends Controller
             'kategori_surat_lainnya' => 'required_if:kategori_surat,Lainnya|string|nullable',
             'tanggal_surat'  => 'required|date',
             'pengirim'       => 'required|string',
-            'penerima_id'    => 'required|exists:users,id',
+            'sifat'          => 'required|in:' . implode(',', array_keys(SuratMasuk::SIFAT)),
+            'jalur_penerimaan' => 'required|in:' . implode(',', array_keys(SuratMasuk::JALUR_PENERIMAAN)),
             'perihal'        => 'required|string',
             'file'           => 'nullable|mimes:pdf,jpg,jpeg,png|max:2048',
-        ]);
+        ] + $this->aturanPenerima());
 
         $kategori = $validated['kategori_surat'] === 'Lainnya' ? $validated['kategori_surat_lainnya'] : $validated['kategori_surat'];
 
@@ -114,16 +145,40 @@ class SuratMasukController extends Controller
             'kategori_surat' => $kategori,
             'tanggal_surat'  => $validated['tanggal_surat'],
             'pengirim'       => $validated['pengirim'],
-            'penerima_id'    => $validated['penerima_id'],
-            'penerima'       => \App\Models\User::find($validated['penerima_id'])->name, // Simpan nama penerima sebagai backup/kompatibilitas
+            'sifat'          => $validated['sifat'],
+            'jalur_penerimaan' => $validated['jalur_penerimaan'],
             'perihal'        => $validated['perihal'],
             'file'           => $filePath,
             'status'         => 'baru',
-        ]);
+        ] + $this->dataPenerima($request));
 
-        ActivityHelper::log('Tambah Surat Masuk', 'Menambahkan surat ' . $suratMasuk->nomor_surat);
+        // Beri tahu seluruh pihak yang berhak membacanya, agar surat tidak
+        // hanya tercatat di database tanpa sampai ke orangnya.
+        foreach ($suratMasuk->penerimaUsers() as $penerima) {
+            $penerima->notify(new SuratMasukDiterima($suratMasuk));
+        }
+
+        ActivityHelper::log('Tambah Surat Masuk', 'Menambahkan surat ' . $suratMasuk->nomor_surat . ' untuk ' . $suratMasuk->label_penerima);
 
         return redirect()->route('surat-masuk.index')->with('success', 'Surat berhasil ditambahkan');
+    }
+
+    public function show(SuratMasuk $surat_masuk)
+    {
+        if (!$surat_masuk->bolehDibacaOleh(auth()->user())) {
+            abort(403, 'Akses ditolak. Surat ini tidak ditujukan kepada Anda.');
+        }
+
+        $surat_masuk->load([
+            'penerimaUser',
+            'disposisis.dariUser',
+            'disposisis.kepadaUser',
+        ]);
+
+        // Riwayat disposisi ditampilkan berurut sesuai perjalanannya.
+        $riwayat = $surat_masuk->disposisis->sortBy('tanggal_disposisi')->values();
+
+        return view('surat_masuk.show', compact('surat_masuk', 'riwayat'));
     }
 
     public function edit(SuratMasuk $surat_masuk)
@@ -143,10 +198,11 @@ class SuratMasukController extends Controller
             'kategori_surat_lainnya' => 'required_if:kategori_surat,Lainnya|string|nullable',
             'tanggal_surat'  => 'required|date',
             'pengirim'       => 'required|string',
-            'penerima_id'    => 'required|exists:users,id',
+            'sifat'          => 'required|in:' . implode(',', array_keys(SuratMasuk::SIFAT)),
+            'jalur_penerimaan' => 'required|in:' . implode(',', array_keys(SuratMasuk::JALUR_PENERIMAAN)),
             'perihal'        => 'required|string',
             'file'           => 'nullable|mimes:pdf,jpg,jpeg,png|max:2048',
-        ]);
+        ] + $this->aturanPenerima());
 
         $kategori = $validated['kategori_surat'] === 'Lainnya' ? $validated['kategori_surat_lainnya'] : $validated['kategori_surat'];
 
@@ -162,16 +218,26 @@ class SuratMasukController extends Controller
             $filePath = $request->file('file')->store('surat_masuk', 'public');
         }
 
+        // Catat siapa saja yang sudah berhak membaca sebelum tujuan diubah,
+        // agar hanya penerima baru yang menerima notifikasi.
+        $penerimaLama = $surat_masuk->penerimaUsers()->pluck('id');
+
         $surat_masuk->update([
             'nomor_surat'    => $validated['nomor_surat'],
             'kategori_surat' => $kategori,
             'tanggal_surat'  => $validated['tanggal_surat'],
             'pengirim'       => $validated['pengirim'],
-            'penerima_id'    => $validated['penerima_id'],
-            'penerima'       => \App\Models\User::find($validated['penerima_id'])->name, // Simpan nama penerima
+            'sifat'          => $validated['sifat'],
+            'jalur_penerimaan' => $validated['jalur_penerimaan'],
             'perihal'        => $validated['perihal'],
             'file'           => $filePath,
-        ]);
+        ] + $this->dataPenerima($request));
+
+        foreach ($surat_masuk->refresh()->penerimaUsers() as $penerima) {
+            if (!$penerimaLama->contains($penerima->id)) {
+                $penerima->notify(new SuratMasukDiterima($surat_masuk));
+            }
+        }
 
         ActivityHelper::log('Edit Surat Masuk', 'Mengubah surat ' . $surat_masuk->nomor_surat);
 

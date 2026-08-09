@@ -51,54 +51,11 @@
                 placeholder="Kosongkan jika tidak ingin mengubah password">
         </div>
 
-        <div class="mb-6">
-            <label class="block mb-2 font-medium">
-                Role
-            </label>
-
-            <select
-                name="role"
-                id="roleSelect"
-                class="w-full border rounded-lg px-4 py-2"
-                required>
-
-                <option value="">-- Pilih Role --</option>
-
-                <option value="admin" {{ old('role', $user->role) == 'admin' ? 'selected' : '' }}>
-                    Administrator
-                </option>
-
-                {{-- Akun lama tersimpan dengan role "administrator". Opsi ini
-                     menjaga nilainya tetap utuh saat data diedit. --}}
-                @if(old('role', $user->role) === 'administrator')
-                <option value="administrator" selected>
-                    Administrator
-                </option>
-                @endif
-
-                <option value="sekretaris" {{ old('role', $user->role) == 'sekretaris' ? 'selected' : '' }}>
-                    Sekretaris
-                </option>
-
-                <option value="dirut" {{ old('role', $user->role) == 'dirut' ? 'selected' : '' }}>
-                    Direktur Utama
-                </option>
-
-                <option value="direktur1" {{ old('role', $user->role) == 'direktur1' ? 'selected' : '' }}>
-                    Direktur I
-                </option>
-
-                <option value="direktur2" {{ old('role', $user->role) == 'direktur2' ? 'selected' : '' }}>
-                    Direktur II
-                </option>
-
-                <option value="staff" {{ old('role', $user->role) == 'staff' ? 'selected' : '' }}>
-                    Staff
-                </option>
-
-            </select>
-
-        </div>
+        @include('users.partials.struktur', [
+            'role'    => old('role', $user->role),
+            'unit'    => old('unit', $user->unit),
+            'jabatan' => old('jabatan', $user->jabatan),
+        ])
 
         {{-- Permission Checkboxes --}}
         <div id="permissionSection" class="mb-6 hidden">

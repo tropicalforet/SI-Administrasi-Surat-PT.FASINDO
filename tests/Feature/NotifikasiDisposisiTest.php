@@ -50,7 +50,7 @@ test('penerima diberi notifikasi saat disposisi dibuat', function () {
     Notification::fake();
 
     $dirut = User::factory()->create(['role' => 'dirut']);
-    $direktur = User::factory()->create(['role' => 'direktur1']);
+    $direktur = User::factory()->create(['role' => 'direktur1', 'unit' => 'teknik']);
     $suratMasuk = suratMasukUji();
 
     $this->actingAs($dirut)->post('/disposisi', [
@@ -66,11 +66,11 @@ test('penerima diberi notifikasi saat disposisi dibuat', function () {
 test('setiap penerima diberi notifikasi saat disposisi diteruskan', function () {
     Notification::fake();
 
-    $direktur = User::factory()->create(['role' => 'direktur1']);
+    $direktur = User::factory()->create(['role' => 'direktur1', 'unit' => 'teknik']);
     beriIzin($direktur, 'akses_disposisi');
 
-    $staffA = User::factory()->create(['role' => 'staff']);
-    $staffB = User::factory()->create(['role' => 'staff']);
+    $staffA = User::factory()->create(['role' => 'staff', 'unit' => 'teknik']);
+    $staffB = User::factory()->create(['role' => 'staff', 'unit' => 'teknik']);
 
     $induk = disposisiUji(
         User::factory()->create(['role' => 'dirut']),
@@ -94,7 +94,7 @@ test('pengingat dikirim untuk disposisi yang jatuh tempo hari ini dan besok', fu
     Notification::fake();
 
     $dirut = User::factory()->create(['role' => 'dirut']);
-    $staff = User::factory()->create(['role' => 'staff']);
+    $staff = User::factory()->create(['role' => 'staff', 'unit' => 'teknik']);
 
     disposisiUji($dirut, $staff, now()->toDateString());
     disposisiUji($dirut, $staff, now()->addDay()->toDateString());
@@ -109,7 +109,7 @@ test('disposisi terlambat dieskalasi ke pemberi disposisi', function () {
     Notification::fake();
 
     $dirut = User::factory()->create(['role' => 'dirut']);
-    $staff = User::factory()->create(['role' => 'staff']);
+    $staff = User::factory()->create(['role' => 'staff', 'unit' => 'teknik']);
 
     disposisiUji($dirut, $staff, now()->subDays(2)->toDateString());
 
@@ -129,7 +129,7 @@ test('disposisi yang sudah selesai tidak diingatkan maupun dieskalasi', function
     Notification::fake();
 
     $dirut = User::factory()->create(['role' => 'dirut']);
-    $staff = User::factory()->create(['role' => 'staff']);
+    $staff = User::factory()->create(['role' => 'staff', 'unit' => 'teknik']);
 
     disposisiUji($dirut, $staff, now()->subDays(3)->toDateString(), 'selesai');
     disposisiUji($dirut, $staff, now()->toDateString(), 'selesai');
@@ -143,7 +143,7 @@ test('notifikasi tenggat tidak dikirim ulang saat perintah berjalan lagi', funct
     Notification::fake();
 
     $dirut = User::factory()->create(['role' => 'dirut']);
-    $staff = User::factory()->create(['role' => 'staff']);
+    $staff = User::factory()->create(['role' => 'staff', 'unit' => 'teknik']);
 
     disposisiUji($dirut, $staff, now()->subDay()->toDateString());
 
@@ -158,7 +158,7 @@ test('disposisi tanpa batas waktu diabaikan', function () {
     Notification::fake();
 
     $dirut = User::factory()->create(['role' => 'dirut']);
-    $staff = User::factory()->create(['role' => 'staff']);
+    $staff = User::factory()->create(['role' => 'staff', 'unit' => 'teknik']);
 
     disposisiUji($dirut, $staff, null);
 
@@ -169,7 +169,7 @@ test('disposisi tanpa batas waktu diabaikan', function () {
 
 test('halaman notifikasi menampilkan pemberitahuan milik pengguna', function () {
     $dirut = User::factory()->create(['role' => 'dirut']);
-    $staff = User::factory()->create(['role' => 'staff']);
+    $staff = User::factory()->create(['role' => 'staff', 'unit' => 'teknik']);
 
     $disposisi = disposisiUji($dirut, $staff, now()->addDay()->toDateString());
     $staff->notify(new DisposisiDiterima($disposisi));
@@ -184,7 +184,7 @@ test('halaman notifikasi menampilkan pemberitahuan milik pengguna', function () 
 
 test('membuka notifikasi menandainya sudah dibaca', function () {
     $dirut = User::factory()->create(['role' => 'dirut']);
-    $staff = User::factory()->create(['role' => 'staff']);
+    $staff = User::factory()->create(['role' => 'staff', 'unit' => 'teknik']);
 
     $disposisi = disposisiUji($dirut, $staff, now()->addDay()->toDateString());
     $staff->notify(new DisposisiDiterima($disposisi));
@@ -200,8 +200,8 @@ test('membuka notifikasi menandainya sudah dibaca', function () {
 
 test('pengguna tidak dapat membuka notifikasi milik orang lain', function () {
     $dirut = User::factory()->create(['role' => 'dirut']);
-    $staff = User::factory()->create(['role' => 'staff']);
-    $penyusup = User::factory()->create(['role' => 'staff']);
+    $staff = User::factory()->create(['role' => 'staff', 'unit' => 'teknik']);
+    $penyusup = User::factory()->create(['role' => 'staff', 'unit' => 'teknik']);
 
     $disposisi = disposisiUji($dirut, $staff, now()->addDay()->toDateString());
     $staff->notify(new DisposisiDiterima($disposisi));

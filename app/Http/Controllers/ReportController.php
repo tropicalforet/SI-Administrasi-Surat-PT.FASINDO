@@ -37,11 +37,14 @@ class ReportController extends Controller
             $query->where('status', $request->status);
         }
 
+        if ($request->filled('sifat')) {
+            $query->where('sifat', $request->sifat);
+        }
+
         if (!$this->isAdminLevel()) {
-            // Hanya lihat surat masuk yang ditujukan kepada user (disposisi)
-            $query->whereHas('disposisis', function($q) {
-                $q->where('kepada_user_id', auth()->id());
-            });
+            // Pakai aturan baca yang sama dengan daftar surat masuk, agar surat
+            // yang ditujukan ke role pengguna tetap muncul walau belum didisposisikan.
+            $query->dapatDibacaOleh(auth()->user());
         }
 
         return $query->latest('tanggal_surat')->get();

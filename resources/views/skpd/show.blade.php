@@ -103,8 +103,89 @@
                 </div>
             @endif
 
+            @php
+                $pengguna = auth()->user();
+                $peran = strtolower($pengguna->role);
+
+                $bolehAjukan = in_array($skpd->status, ['draft', 'ditolak'])
+                    && ($peran === 'sekretaris'
+                        || $skpd->user_id === $pengguna->id
+                        || $skpd->ditugaskan_oleh === $pengguna->id);
+
+                $bolehSetujuiDirektur = $skpd->status === 'menunggu_direktur'
+                    && $pengguna->isDirektur()
+                    && $skpd->user?->unit === $pengguna->unit;
+            @endphp
+
+            @if($bolehAjukan)
+                <div class="bg-white rounded-2xl shadow-sm border border-slate-200 p-6 no-print">
+                    <h3 class="text-base font-bold text-slate-800 mb-2">Ajukan Penugasan</h3>
+                    <p class="text-xs text-slate-500 mb-5 leading-relaxed">
+                        {{ $skpd->asal_usul === 'usulan'
+                            ? 'Usulan ini akan diteruskan ke direktur unit Anda untuk disetujui lebih dulu.'
+                            : 'Penugasan ini akan diteruskan ke pejabat berwenang untuk disetujui.' }}
+                    </p>
+
+                    <form action="{{ route('skpd.ajukan', $skpd->id) }}" method="POST"
+                          onsubmit="event.preventDefault(); ConfirmModal.show({title:'Ajukan Penugasan',message:'Setelah diajukan, dokumen tidak dapat diubah sampai ada keputusan. Lanjutkan?',variant:'info',confirmText:'Ya, Ajukan'}).then(ok=>{if(ok)this.submit()})">
+                        @csrf
+                        @method('PUT')
+                        <button type="submit" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold py-2.5 px-5 rounded-xl transition duration-200 shadow-md shadow-blue-500/10 text-xs">
+                            Ajukan
+                        </button>
+                    </form>
+                </div>
+            @endif
+
+            @if($bolehSetujuiDirektur)
+                <div class="bg-white rounded-2xl shadow-sm border border-slate-200 p-6 no-print">
+                    <h3 class="text-base font-bold text-slate-800 mb-2">Persetujuan Direktur</h3>
+                    <p class="text-xs text-slate-500 mb-5 leading-relaxed">
+                        Sebagai {{ $pengguna->label_jabatan }}, putuskan apakah penugasan
+                        {{ $skpd->nama_pegawai }} ini memang diperlukan sebelum diteruskan ke Direktur Utama.
+                    </p>
+
+                    <div class="flex items-center gap-3">
+                        <form action="{{ route('skpd.setujui-direktur', $skpd->id) }}" method="POST"
+                              onsubmit="event.preventDefault(); ConfirmModal.show({title:'Setujui Usulan',message:'Penugasan ini akan diteruskan ke Direktur Utama. Lanjutkan?',variant:'approve',confirmText:'Ya, Setujui'}).then(ok=>{if(ok)this.submit()})"
+                              class="flex-1">
+                            @csrf
+                            @method('PUT')
+                            <button type="submit" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold py-2.5 px-5 rounded-xl transition duration-200 shadow-md shadow-blue-500/10 text-xs">
+                                Setujui Usulan
+                            </button>
+                        </form>
+
+                        <button onclick="document.getElementById('tolak-skpd-direktur').classList.toggle('hidden')"
+                                class="flex-1 bg-red-50 hover:bg-red-100 text-red-600 font-semibold py-2.5 px-5 border border-red-100 rounded-xl transition duration-200 text-xs">
+                            Tolak
+                        </button>
+                    </div>
+
+                    <div id="tolak-skpd-direktur" class="hidden mt-4 pt-4 border-t border-slate-100">
+                        <form action="{{ route('skpd.reject', $skpd->id) }}" method="POST">
+                            @csrf
+                            @method('PUT')
+                            <label class="block text-xs font-semibold text-slate-700 mb-2">
+                                Alasan Penolakan <span class="text-red-500">*</span>
+                            </label>
+                            <textarea name="catatan_revisi" rows="3" required
+                                      placeholder="Jelaskan mengapa penugasan ini tidak disetujui..."
+                                      class="w-full px-4 py-2 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-red-500 outline-none text-slate-800 text-xs resize-none"></textarea>
+                            <div class="flex justify-end gap-3 mt-3">
+                                <button type="button" onclick="document.getElementById('tolak-skpd-direktur').classList.add('hidden')"
+                                        class="px-3 py-1.5 text-xs font-semibold text-slate-500 hover:text-slate-700">Batal</button>
+                                <button type="submit" class="bg-red-600 hover:bg-red-700 text-white font-semibold py-1.5 px-3 rounded-lg text-xs">
+                                    Kirim Penolakan
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            @endif
+
             <!-- APPROVAL ACTION CARD FOR DIRUT (no-print) -->
-            @if(strtolower(auth()->user()->role) === 'dirut' && strtolower($skpd->status) === 'diperiksa')
+            @if(strtolower(auth()->user()->role) === 'dirut' && $skpd->status === 'menunggu_dirut')
                 <div class="bg-white rounded-2xl shadow-sm border border-slate-200 p-6 no-print">
                     <h3 class="text-base font-bold text-slate-800 mb-2">Persetujuan Dokumen SKPD</h3>
                     <p class="text-xs text-slate-500 mb-6 leading-relaxed">Sebagai Direktur Utama, Anda dapat menyetujui dokumen perjalanan dinas ini atau mengembalikannya untuk direvisi.</p>
@@ -166,7 +247,7 @@
                     </div>
                     <div>
                         <span class="text-slate-400 font-bold block uppercase text-[9px] tracking-wider">Tujuan Dinas</span>
-                        <span class="font-semibold text-slate-800 block mt-0.5">{{ $skpd->tujuan_dinas }}</span>
+                        <span class="font-semibold text-slate-800 block mt-0.5">{{ $skpd->berupaPerjalanan() ? $skpd->tujuan_dinas : '— (tugas internal)' }}</span>
                     </div>
                     <div>
                         <span class="text-slate-400 font-bold block uppercase text-[9px] tracking-wider">Keperluan Dinas</span>

@@ -63,7 +63,7 @@
                         <tr class="hover:bg-slate-50/80 transition-colors">
                             <td class="py-4 px-6">{{ $loop->iteration }}</td>
                             <td class="py-4 px-6 whitespace-nowrap">{{ \Carbon\Carbon::parse($item->created_at)->translatedFormat('d M Y') }}</td>
-                            <td class="py-4 px-6 font-medium text-slate-800">{{ $item->suratMasuk->nomor_surat ?? '-' }}</td>
+                            <td class="py-4 px-6 font-medium text-slate-800">{{ $item->suratMasuk?->nomor_surat ?? '-' }}</td>
                             <td class="py-4 px-6">{{ $item->dariUser->name ?? '-' }}</td>
                             <td class="py-4 px-6">{{ $item->kepadaUser->name ?? '-' }}</td>
                             <td class="py-4 px-6">{{ $item->instruksi }}</td>

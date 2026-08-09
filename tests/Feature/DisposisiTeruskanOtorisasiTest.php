@@ -18,7 +18,7 @@ function suratMasukTeruskan(string $nomor): SuratMasuk
 
 function direkturBerizin(): User
 {
-    $user = User::factory()->create(['role' => 'direktur1']);
+    $user = User::factory()->create(['role' => 'direktur1', 'unit' => 'teknik']);
 
     $permission = Permission::firstOrCreate(
         ['name' => 'akses_disposisi'],
@@ -34,7 +34,7 @@ test('pengguna tidak dapat meneruskan disposisi milik orang lain', function () {
     $dirut = User::factory()->create(['role' => 'dirut']);
     $pemilik = direkturBerizin();
     $penyusup = direkturBerizin();
-    $staff = User::factory()->create(['role' => 'staff']);
+    $staff = User::factory()->create(['role' => 'staff', 'unit' => 'teknik']);
 
     $disposisi = Disposisi::create([
         'surat_masuk_id'    => suratMasukTeruskan('SM-001/VIII/2026')->id,
@@ -58,7 +58,7 @@ test('pengguna tidak dapat meneruskan disposisi milik orang lain', function () {
 test('surat masuk pada disposisi lanjutan diambil dari induk, bukan dari input', function () {
     $dirut = User::factory()->create(['role' => 'dirut']);
     $pemilik = direkturBerizin();
-    $staff = User::factory()->create(['role' => 'staff']);
+    $staff = User::factory()->create(['role' => 'staff', 'unit' => 'teknik']);
 
     $suratAsli = suratMasukTeruskan('SM-001/VIII/2026');
     $suratLain = suratMasukTeruskan('SM-999/VIII/2026');
@@ -88,7 +88,7 @@ test('surat masuk pada disposisi lanjutan diambil dari induk, bukan dari input',
 test('penerima disposisi tetap dapat meneruskannya', function () {
     $dirut = User::factory()->create(['role' => 'dirut']);
     $pemilik = direkturBerizin();
-    $staff = User::factory()->create(['role' => 'staff']);
+    $staff = User::factory()->create(['role' => 'staff', 'unit' => 'teknik']);
 
     $disposisi = Disposisi::create([
         'surat_masuk_id'    => suratMasukTeruskan('SM-001/VIII/2026')->id,
