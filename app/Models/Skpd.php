@@ -10,15 +10,6 @@ class Skpd extends Model
     use SoftDeletes;
 
     /**
-     * SKPD kini mencakup dua macam penugasan. Tujuan dan lama perjalanan
-     * hanya relevan bagi yang benar-benar bepergian.
-     */
-    public const JENIS = [
-        'perjalanan_dinas' => 'Perjalanan Dinas',
-        'internal'         => 'Tugas Internal',
-    ];
-
-    /**
      * Dari mana penugasan ini berasal.
      */
     public const ASAL_USUL = [
@@ -34,6 +25,50 @@ class Skpd extends Model
         'ditolak'           => 'Ditolak',
     ];
 
+    /**
+     * Kewenangan menugaskan mengikuti garis komando, bukan pangkat semata.
+     *
+     * Direktur Utama membawahi seluruh struktur. Direktur bidang hanya
+     * membawahi tiga posisi di direktoratnya masing-masing. Sekretaris tidak
+     * termasuk: ia tidak punya bawahan di bagan, jadi ia mengusulkan untuk
+     * dirinya sendiri seperti pegawai lain.
+     */
+    public static function bolehMenugaskan(User $user): bool
+    {
+        return strtolower($user->role) === 'dirut' || $user->isDirektur();
+    }
+
+    /**
+     * Pegawai yang boleh ditugaskan oleh $penugas.
+     *
+     * Administrator tidak muncul karena berada di luar bagan organisasi.
+     * Penugas selalu termasuk dirinya sendiri - seorang direktur pun perlu
+     * jalan untuk berdinas, dan dokumen atas namanya sendiri diperlakukan
+     * sebagai usulan, bukan penugasan.
+     */
+    public static function calonPegawai(User $penugas)
+    {
+        if (strtolower($penugas->role) === 'dirut') {
+            return User::whereNotIn('role', ['admin', 'administrator', 'superadmin'])
+                ->orderBy('unit')->orderBy('role')->orderBy('name')->get();
+        }
+
+        if ($penugas->isDirektur()) {
+            return $penugas->bawahanSeunit()->prepend($penugas);
+        }
+
+        return collect();
+    }
+
+    /**
+     * Apakah $penugas berwenang menugaskan pegawai tertentu.
+     */
+    public static function bolehMenugaskanPegawai(User $penugas, $pegawaiId): bool
+    {
+        return self::calonPegawai($penugas)
+            ->contains(fn ($calon) => (int) $calon->id === (int) $pegawaiId);
+    }
+
     protected $fillable = [
         'user_id',
         'ditugaskan_oleh',
@@ -42,7 +77,6 @@ class Skpd extends Model
         'surat_masuk_id',
         'surat_tugas_id',
         'nomor_skpd',
-        'jenis',
         'asal_usul',
         'nama_pegawai',
         'tujuan_dinas',
@@ -58,6 +92,14 @@ class Skpd extends Model
     protected $casts = [
         'disetujui_direktur_at' => 'datetime',
     ];
+
+    /**
+     * Pengajuan belum bernomor sampai disetujui Direktur Utama.
+     */
+    public function getLabelNomorAttribute(): string
+    {
+        return $this->nomor_skpd ?: '(Belum bernomor)';
+    }
 
     // ==========================
     // RELASI
@@ -101,19 +143,9 @@ class Skpd extends Model
         return self::STATUS[$this->status] ?? ucfirst(str_replace('_', ' ', $this->status));
     }
 
-    public function getLabelJenisAttribute(): string
-    {
-        return self::JENIS[$this->jenis] ?? '-';
-    }
-
     public function getLabelAsalUsulAttribute(): string
     {
         return self::ASAL_USUL[$this->asal_usul] ?? '-';
-    }
-
-    public function berupaPerjalanan(): bool
-    {
-        return $this->jenis === 'perjalanan_dinas';
     }
 
     // ==========================
@@ -135,23 +167,35 @@ class Skpd extends Model
     }
 
     /**
-     * Perlu persetujuan direktur bila penugasan tidak diterbitkan pihak yang
-     * memang berwenang atas pegawainya. Dirut membawahi semua, dan direktur
-     * unit bersangkutan adalah atasan langsungnya.
+     * Perlu persetujuan direktur bila ada direktur di atas pegawainya yang
+     * belum menilai dokumen ini.
      */
     public function perluPersetujuanDirektur(): bool
     {
-        $penugas = $this->ditugaskanOleh;
+        $direktur = $this->direkturPenyetuju();
 
-        if (!$penugas) {
-            return true; // usulan pegawai sendiri
+        // Tidak ada direktur di atasnya - pegawai unit pimpinan, atau
+        // pegawainya justru direktur itu sendiri. Tidak seorang pun boleh
+        // menjadi penyetuju usulannya sendiri, jadi langsung ke Dirut.
+        if (!$direktur || $direktur->id === $this->user?->id) {
+            return false;
         }
 
+        $penugas = $this->ditugaskanOleh;
+
+        // Usulan pegawai selalu dinilai direkturnya lebih dulu.
+        if (!$penugas) {
+            return true;
+        }
+
+        // Dirut adalah keputusan terakhir; ia tidak meminta izin bawahannya.
         if (strtolower($penugas->role) === 'dirut') {
             return false;
         }
 
-        return !($penugas->isDirektur() && $penugas->unit === $this->user?->unit);
+        // Direktur yang menugaskan bawahannya sendiri sudah menyatakan
+        // persetujuannya lewat penugasan itu - tidak perlu menyetujui dua kali.
+        return $penugas->id !== $direktur->id;
     }
 
     // ==========================
@@ -159,11 +203,49 @@ class Skpd extends Model
     // ==========================
 
     /**
+     * Draf belum diajukan, jadi masih kertas kerja pemiliknya - baik pegawai
+     * yang mengusulkan maupun atasan yang sedang menyusun penugasan. Tidak
+     * seorang pun melihat draf orang lain, termasuk pimpinan dan
+     * administrator. Dipakai bersama oleh daftar SKPD dan laporan.
+     */
+    public function scopeTanpaDrafOrangLain($query, User $user)
+    {
+        return $query->where(function ($q) use ($user) {
+            $q->where('status', '!=', 'draft')
+              ->orWhere('user_id', $user->id)
+              ->orWhere('ditugaskan_oleh', $user->id);
+        });
+    }
+
+    /**
+     * Jangkauan rekapitulasi pada Laporan SKPD, mengikuti garis komando.
+     *
+     * Direktur Utama dan Sekretaris merekap seluruh karyawan. Direktur bidang
+     * merekap direktoratnya saja - bawahannya berikut dirinya sendiri, karena
+     * rekap divisi yang menghilangkan perjalanan direkturnya bukan rekap yang
+     * utuh. Selebihnya hanya melihat miliknya sendiri.
+     */
+    public function scopeLaporanUntuk($query, User $user)
+    {
+        if (in_array(strtolower($user->role), ['admin', 'administrator', 'superadmin', 'dirut', 'sekretaris'])) {
+            return $query;
+        }
+
+        if ($user->isDirektur() && $user->unit) {
+            return $query->whereHas('user', fn ($q) => $q->where('unit', $user->unit));
+        }
+
+        return $query->where('user_id', $user->id);
+    }
+
+    /**
      * Direktur wajib dapat melihat penugasan pegawai di unitnya - tanpa ini
      * ia diberi kewajiban menyetujui dokumen yang tidak dapat ia buka.
      */
     public function scopeTerlihatOleh($query, User $user)
     {
+        $query->tanpaDrafOrangLain($user);
+
         if (in_array(strtolower($user->role), ['admin', 'administrator', 'superadmin', 'dirut', 'sekretaris'])) {
             return $query;
         }
@@ -180,11 +262,16 @@ class Skpd extends Model
 
     public function dapatDilihatOleh(User $user): bool
     {
-        if (in_array(strtolower($user->role), ['admin', 'administrator', 'superadmin', 'dirut', 'sekretaris'])) {
+        if ($this->user_id === $user->id || $this->ditugaskan_oleh === $user->id) {
             return true;
         }
 
-        if ($this->user_id === $user->id || $this->ditugaskan_oleh === $user->id) {
+        // Draf orang lain tertutup bagi siapa pun.
+        if ($this->status === 'draft') {
+            return false;
+        }
+
+        if (in_array(strtolower($user->role), ['admin', 'administrator', 'superadmin', 'dirut', 'sekretaris'])) {
             return true;
         }
 

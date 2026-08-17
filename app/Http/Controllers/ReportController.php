@@ -13,18 +13,15 @@ use Carbon\Carbon;
 
 class ReportController extends Controller
 {
-    private function isAdminLevel()
-    {
-        return in_array(strtolower(auth()->user()->role), ['admin', 'administrator', 'superadmin', 'dirut', 'sekretaris']);
-    }
-
     // ==========================================
     // SURAT MASUK
     // ==========================================
     private function querySuratMasuk(Request $request)
     {
-        $query = SuratMasuk::query();
-        
+        // Jangkauan rekap ditentukan sekali di model - lihat
+        // SuratMasuk::scopeLaporanUntuk.
+        $query = SuratMasuk::laporanUntuk(auth()->user());
+
         if ($request->filled('start_date') && $request->filled('end_date')) {
             $query->whereBetween('tanggal_surat', [$request->start_date, $request->end_date]);
         }
@@ -39,12 +36,6 @@ class ReportController extends Controller
 
         if ($request->filled('sifat')) {
             $query->where('sifat', $request->sifat);
-        }
-
-        if (!$this->isAdminLevel()) {
-            // Pakai aturan baca yang sama dengan daftar surat masuk, agar surat
-            // yang ditujukan ke role pengguna tetap muncul walau belum didisposisikan.
-            $query->dapatDibacaOleh(auth()->user());
         }
 
         return $query->latest('tanggal_surat')->get();
@@ -69,8 +60,10 @@ class ReportController extends Controller
     // ==========================================
     private function querySuratKeluar(Request $request)
     {
-        $query = SuratKeluar::query();
-        
+        // Jangkauan rekap dan pengecualian draf ditentukan sekali di model -
+        // lihat SuratKeluar::scopeLaporanUntuk.
+        $query = SuratKeluar::laporanUntuk(auth()->user());
+
         if ($request->filled('start_date') && $request->filled('end_date')) {
             $query->whereBetween('tanggal_surat', [$request->start_date, $request->end_date]);
         }
@@ -81,14 +74,6 @@ class ReportController extends Controller
         
         if ($request->filled('status')) {
             $query->where('status', $request->status);
-        }
-
-        // Untuk surat keluar, saat ini tidak ada relasi user pembuat. 
-        // Anggap saja semua direktur bisa lihat surat keluar perusahaannya.
-        // Jika perlu dibatasi, sesuaikan logikanya di sini.
-        // Tapi sementara kita perlihatkan semua, karena di menu utama Surat Keluar juga terbuka (kecuali draft).
-        if (!$this->isAdminLevel()) {
-            $query->where('status', '!=', 'draft'); // staff dkk tidak lihat draft
         }
 
         return $query->latest('tanggal_surat')->get();
@@ -123,10 +108,9 @@ class ReportController extends Controller
             $query->where('status', $request->status);
         }
 
-        if (!$this->isAdminLevel()) {
-            $query->where('kepada_user_id', auth()->id());
-        }
-
+        // Tidak ada penyempitan per pengguna: yang sampai ke sini hanya
+        // Direktur Utama, Sekretaris, dan administrator - dan justru rekam
+        // jejak menyeluruh itulah gunanya laporan ini.
         return $query->latest()->get();
     }
 
@@ -148,14 +132,15 @@ class ReportController extends Controller
     // ==========================================
     private function querySkpd(Request $request)
     {
-        $query = Skpd::with('user');
-        
+        // Jangkauan rekap mengikuti garis komando, bukan disamakan untuk semua
+        // role - lihat Skpd::scopeLaporanUntuk.
+        $query = Skpd::with('user')
+            ->tanpaDrafOrangLain(auth()->user())
+            ->laporanUntuk(auth()->user());
+
         if ($request->filled('start_date') && $request->filled('end_date')) {
             $query->whereBetween('tanggal_berangkat', [$request->start_date, $request->end_date]);
         }
-
-        // Terapkan ke semua role: Laporan SKPD hanya menampilkan data milik sendiri
-        $query->where('user_id', auth()->id());
 
         return $query->latest('tanggal_berangkat')->get();
     }

@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html>
 <head>
     <title>Laporan SKPD</title>
@@ -50,7 +50,7 @@
             @forelse($data as $item)
                 <tr>
                     <td class="text-center">{{ $loop->iteration }}</td>
-                    <td>{{ $item->nomor_skpd }}</td>
+                    <td>{{ $item->label_nomor }}</td>
                     <td>{{ $item->nama_pegawai }}</td>
                     <td><strong>{{ $item->tujuan_dinas }}</strong><br>{{ $item->keperluan }}</td>
                     <td class="text-center">{{ \Carbon\Carbon::parse($item->tanggal_berangkat)->format('d/m/Y') }}</td>

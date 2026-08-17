@@ -14,14 +14,16 @@ class SuratKeluar extends Model
      * Alur persetujuan surat keluar.
      */
     public const STATUS = [
-        'draft'             => 'Draft',
-        'menunggu_direktur' => 'Menunggu Verifikasi Direktur',
-        'menunggu_dirut'    => 'Menunggu Persetujuan Dirut',
-        'terkirim'          => 'Terkirim',
-        'ditolak'           => 'Ditolak',
+        'draft'               => 'Draft',
+        'menunggu_direktur'   => 'Menunggu Verifikasi Direktur (alur lama)',
+        'menunggu_sekretaris' => 'Menunggu Penomoran Sekretaris',
+        'menunggu_dirut'      => 'Menunggu Tanda Tangan Dirut',
+        'terkirim'            => 'Terkirim',
+        'ditolak'             => 'Ditolak',
     ];
 
     protected $fillable = [
+        'dibuat_oleh',
         'nomor_surat',
         'kategori_surat',
         'unit_verifikasi',
@@ -54,6 +56,100 @@ class SuratKeluar extends Model
         );
     }
 
+    public function pembuat()
+    {
+        return $this->belongsTo(User::class, 'dibuat_oleh');
+    }
+
+    /**
+     * Draf belum bernomor sampai sekretaris memprosesnya.
+     */
+    public function getLabelNomorAttribute(): string
+    {
+        return $this->nomor_surat ?: '(Belum bernomor)';
+    }
+
+    /**
+     * Draf adalah kertas kerja penyusunnya, belum menjadi dokumen kantor
+     * sampai diajukan. Karena itu tidak seorang pun melihat draf orang lain -
+     * termasuk sekretaris, Direktur Utama, dan administrator. Begitu diajukan,
+     * aturan keterlihatan biasa kembali berlaku.
+     *
+     * Ditulis sebagai scope tersendiri supaya daftar surat dan laporan
+     * memakai batasan yang sama persis.
+     */
+    public function scopeTanpaDrafOrangLain($query, User $user)
+    {
+        return $query->where(function ($q) use ($user) {
+            $q->where('status', '!=', 'draft')
+              ->orWhere('dibuat_oleh', $user->id);
+        });
+    }
+
+    /**
+     * Jangkauan Laporan Surat Keluar.
+     *
+     * Laporan ini adalah ikhtisar surat yang benar-benar diterbitkan, jadi
+     * draf tidak masuk rekap siapa pun - termasuk draf milik pembaca laporan
+     * itu sendiri. Jajaran direksi (Dirut, Sekretaris, dan para Direktur
+     * bidang) membaca seluruh perusahaan; selebihnya hanya surat susunannya.
+     */
+    public function scopeLaporanUntuk($query, User $user)
+    {
+        $query->where('status', '!=', 'draft');
+
+        $direksi = in_array(strtolower($user->role), ['admin', 'administrator', 'superadmin', 'dirut', 'sekretaris'])
+            || $user->isDirektur();
+
+        return $direksi ? $query : $query->where('dibuat_oleh', $user->id);
+    }
+
+    /**
+     * Batasi daftar pada surat yang boleh dilihat pengguna.
+     *
+     * Penyusun melihat surat buatannya sendiri, direktur melihat surat yang
+     * menjadi kewenangan direktoratnya, sedangkan sekretaris dan pimpinan
+     * melihat seluruhnya - kecuali draf orang lain.
+     */
+    public function scopeTerlihatOleh($query, User $user)
+    {
+        $query->tanpaDrafOrangLain($user);
+
+        if (in_array(strtolower($user->role), ['admin', 'administrator', 'superadmin', 'dirut', 'sekretaris'])) {
+            return $query;
+        }
+
+        return $query->where(function ($q) use ($user) {
+            $q->where('dibuat_oleh', $user->id);
+
+            // Direktur melihat surat yang berasal dari unitnya, sebagai
+            // keterbukaan - bukan karena punya tahap persetujuan.
+            if ($user->isDirektur() && $user->unit) {
+                $q->orWhere('unit_verifikasi', $user->unit);
+            }
+        });
+    }
+
+    public function dapatDilihatOleh(User $user): bool
+    {
+        if ($this->dibuat_oleh === $user->id) {
+            return true;
+        }
+
+        // Draf orang lain tertutup bagi siapa pun.
+        if ($this->status === 'draft') {
+            return false;
+        }
+
+        if (in_array(strtolower($user->role), ['admin', 'administrator', 'superadmin', 'dirut', 'sekretaris'])) {
+            return true;
+        }
+
+        return $user->isDirektur()
+            && $user->unit
+            && $this->unit_verifikasi === $user->unit;
+    }
+
     public function getLabelStatusAttribute(): string
     {
         return self::STATUS[$this->status] ?? ucfirst(str_replace('_', ' ', $this->status));
@@ -62,21 +158,6 @@ class SuratKeluar extends Model
     public function getLabelUnitVerifikasiAttribute(): string
     {
         return User::UNIT[$this->unit_verifikasi] ?? '-';
-    }
-
-    /**
-     * Direktur yang berwenang memverifikasi surat ini, yaitu direktur pada unit
-     * yang dipilih saat surat disusun.
-     */
-    public function direkturVerifikator()
-    {
-        if (!$this->unit_verifikasi) {
-            return null;
-        }
-
-        return User::whereIn('role', ['direktur1', 'direktur2'])
-            ->where('unit', $this->unit_verifikasi)
-            ->first();
     }
 
     public function getVerifyTokenAttribute()

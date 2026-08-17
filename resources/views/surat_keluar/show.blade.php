@@ -140,59 +140,96 @@
                     $isDirut = $user->role === 'dirut';
                     $showDirutAction = $isDirut && $surat_keluar->status === 'menunggu_dirut';
 
-                    // Direktur hanya memverifikasi surat pada direktoratnya sendiri.
-                    $showVerifikasiAction = $user->isDirektur()
-                        && $surat_keluar->status === 'menunggu_direktur'
-                        && $surat_keluar->unit_verifikasi === $user->unit;
+                    $showSekretarisAction = strtolower($user->role) === 'sekretaris'
+                        && $surat_keluar->status === 'menunggu_sekretaris';
+
+                    // Penyusun mengurus konsepnya sendiri; sekretaris boleh membantu.
+                    $bolehAjukan = in_array($surat_keluar->status, ['draft', 'ditolak'])
+                        && (strtolower($user->role) === 'sekretaris'
+                            || $surat_keluar->dibuat_oleh === $user->id);
                 @endphp
 
-                @if($showVerifikasiAction)
+                @if($bolehAjukan)
                     <div class="bg-white rounded-2xl shadow-sm border border-slate-200 p-6 no-print">
-                        <h3 class="text-base font-bold text-slate-800 mb-2">Verifikasi Direktur</h3>
-                        <p class="text-xs text-slate-500 mb-6 leading-relaxed">
-                            Sebagai {{ $user->label_jabatan }}, periksa isi surat ini lalu bubuhkan verifikasi agar
-                            diteruskan ke Direktur Utama untuk ditandatangani. Bila masih perlu diperbaiki,
-                            kembalikan ke sekretaris dengan catatan revisi.
+                        <h3 class="text-base font-bold text-slate-800 mb-2">
+                            {{ $surat_keluar->status === 'ditolak' ? 'Perbaiki & Ajukan Ulang' : 'Ajukan Konsep' }}
+                        </h3>
+
+                        @if($surat_keluar->status === 'ditolak' && $surat_keluar->catatan_revisi)
+                            <div class="mb-4 p-3 bg-red-50 border border-red-100 rounded-xl">
+                                <p class="text-[11px] font-bold text-red-700 uppercase tracking-wider mb-1">Catatan Perbaikan</p>
+                                <p class="text-xs text-red-700 italic">"{{ $surat_keluar->catatan_revisi }}"</p>
+                            </div>
+                        @endif
+
+                        <p class="text-xs text-slate-500 mb-5 leading-relaxed">
+                            Konsep akan dikirim ke <strong>sekretaris</strong> untuk dinomori dan
+                            diperiksa formatnya, lalu Direktur Utama menandatangani.
                         </p>
 
-                        <div class="flex flex-col gap-4">
-                            <div class="flex items-center gap-3">
-                                <form action="{{ route('surat-keluar.verifikasi', $surat_keluar->id) }}" method="POST"
-                                      onsubmit="event.preventDefault(); ConfirmModal.show({title:'Verifikasi Surat',message:'Surat ini akan diteruskan ke Direktur Utama untuk ditandatangani. Lanjutkan?',variant:'approve',confirmText:'Ya, Verifikasi'}).then(ok=>{if(ok)this.submit()})"
-                                      class="inline flex-1">
-                                    @csrf
-                                    @method('PUT')
-                                    <button type="submit" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold py-2.5 px-4 rounded-xl transition duration-200 shadow-md shadow-blue-500/10 text-xs cursor-pointer flex items-center justify-center gap-1.5">
-                                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
-                                        Verifikasi & Teruskan
-                                    </button>
-                                </form>
-
-                                <button onclick="document.getElementById('reject-form-container').classList.toggle('hidden')" class="flex-1 bg-red-50 hover:bg-red-100 text-red-600 font-semibold py-2.5 px-4 border border-red-100 rounded-xl transition duration-200 text-xs cursor-pointer flex items-center justify-center gap-1.5">
-                                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
-                                    Kembalikan
+                        <div class="flex items-center gap-3">
+                            <form action="{{ route('surat-keluar.submit', $surat_keluar->id) }}" method="POST"
+                                  onsubmit="event.preventDefault(); ConfirmModal.show({title:'Ajukan Konsep',message:'Setelah diajukan, konsep tidak dapat diubah sampai ada keputusan. Lanjutkan?',variant:'info',confirmText:'Ya, Ajukan'}).then(ok=>{if(ok)this.submit()})"
+                                  class="flex-1">
+                                @csrf
+                                @method('PUT')
+                                <button type="submit" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold py-2.5 px-4 rounded-xl transition duration-200 shadow-md shadow-blue-500/10 text-xs">
+                                    {{ $surat_keluar->status === 'ditolak' ? 'Ajukan Ulang' : 'Ajukan' }}
                                 </button>
-                            </div>
+                            </form>
 
-                            <div id="reject-form-container" class="hidden mt-4 pt-4 border-t border-slate-100">
-                                <form action="{{ route('surat-keluar.reject', $surat_keluar->id) }}" method="POST">
-                                    @csrf
-                                    @method('PUT')
-                                    <label class="block text-xs font-semibold text-slate-700 mb-2">
-                                        Catatan Revisi <span class="text-red-500">*</span>
-                                    </label>
-                                    <textarea name="catatan_revisi" rows="3" required placeholder="Tuliskan poin yang perlu diperbaiki..." class="w-full px-4 py-2 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-red-500 focus:border-red-500 focus:bg-white outline-none transition-all text-slate-800 text-xs resize-none"></textarea>
+                            <a href="{{ route('surat-keluar.edit', $surat_keluar->id) }}"
+                               class="flex-1 text-center bg-white border border-slate-200 hover:bg-slate-50 text-slate-700 font-semibold py-2.5 px-4 rounded-xl transition duration-200 text-xs">
+                                Ubah Konsep
+                            </a>
+                        </div>
+                    </div>
+                @endif
 
-                                    <div class="flex justify-end gap-3 mt-3">
-                                        <button type="button" onclick="document.getElementById('reject-form-container').classList.add('hidden')" class="px-3 py-1.5 text-xs font-semibold text-slate-500 hover:text-slate-700">
-                                            Batal
-                                        </button>
-                                        <button type="submit" class="bg-red-600 hover:bg-red-700 text-white font-semibold py-1.5 px-3 rounded-lg text-xs shadow-md shadow-red-500/10">
-                                            Kembalikan ke Sekretaris
-                                        </button>
-                                    </div>
-                                </form>
-                            </div>
+                @if($showSekretarisAction)
+                    <div class="bg-white rounded-2xl shadow-sm border border-slate-200 p-6 no-print">
+                        <h3 class="text-base font-bold text-slate-800 mb-2">Penomoran &amp; Pemeriksaan Format</h3>
+                        <p class="text-xs text-slate-500 mb-6 leading-relaxed">
+                            Konsep dari {{ $surat_keluar->pembuat->name ?? 'penyusun' }}.
+                            Pastikan formatnya sesuai standar perusahaan, lalu terbitkan nomornya agar
+                            surat naik ke Direktur Utama untuk ditandatangani.
+                        </p>
+
+                        <div class="flex items-center gap-3">
+                            <form action="{{ route('surat-keluar.proses-sekretaris', $surat_keluar->id) }}" method="POST"
+                                  onsubmit="event.preventDefault(); ConfirmModal.show({title:'Terbitkan Nomor Surat',message:'Nomor surat resmi akan diterbitkan dan surat diteruskan ke Direktur Utama. Lanjutkan?',variant:'approve',confirmText:'Ya, Terbitkan Nomor'}).then(ok=>{if(ok)this.submit()})"
+                                  class="flex-1">
+                                @csrf
+                                @method('PUT')
+                                <button type="submit" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold py-2.5 px-4 rounded-xl transition duration-200 shadow-md shadow-blue-500/10 text-xs">
+                                    Terbitkan Nomor &amp; Teruskan
+                                </button>
+                            </form>
+
+                            <button onclick="document.getElementById('reject-form-container').classList.toggle('hidden')"
+                                    class="flex-1 bg-red-50 hover:bg-red-100 text-red-600 font-semibold py-2.5 px-4 border border-red-100 rounded-xl transition duration-200 text-xs">
+                                Kembalikan
+                            </button>
+                        </div>
+
+                        <div id="reject-form-container" class="hidden mt-4 pt-4 border-t border-slate-100">
+                            <form action="{{ route('surat-keluar.reject', $surat_keluar->id) }}" method="POST">
+                                @csrf
+                                @method('PUT')
+                                <label class="block text-xs font-semibold text-slate-700 mb-2">
+                                    Catatan Perbaikan Format <span class="text-red-500">*</span>
+                                </label>
+                                <textarea name="catatan_revisi" rows="3" required
+                                          placeholder="Contoh: kop surat belum sesuai standar, penulisan tujuan perlu diperbaiki..."
+                                          class="w-full px-4 py-2 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-red-500 outline-none text-slate-800 text-xs resize-none"></textarea>
+                                <div class="flex justify-end gap-3 mt-3">
+                                    <button type="button" onclick="document.getElementById('reject-form-container').classList.add('hidden')"
+                                            class="px-3 py-1.5 text-xs font-semibold text-slate-500 hover:text-slate-700">Batal</button>
+                                    <button type="submit" class="bg-red-600 hover:bg-red-700 text-white font-semibold py-1.5 px-3 rounded-lg text-xs">
+                                        Kembalikan ke Penyusun
+                                    </button>
+                                </div>
+                            </form>
                         </div>
                     </div>
                 @endif

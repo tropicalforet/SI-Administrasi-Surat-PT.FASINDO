@@ -4,16 +4,24 @@ namespace App\Notifications;
 
 use App\Models\SuratKeluar;
 use Illuminate\Notifications\Notification;
+use InvalidArgumentException;
 
+/**
+ * Pemberitahuan bahwa sebuah surat keluar menunggu tindakan penerimanya.
+ *
+ * Berbeda dengan SuratKeluarDiputuskan yang mengabarkan keputusan yang sudah
+ * diambil, kelas ini mengabarkan giliran: ada yang harus dikerjakan penerima.
+ */
 class SuratKeluarMenungguTindakan extends Notification
 {
     /**
-     * @param  string  $tindakan  'verifikasi' bagi direktur terkait, atau
+     * @param  string  $tindakan  'penomoran' bagi Sekretaris, atau
      *                            'persetujuan' bagi Direktur Utama.
      */
     public function __construct(
         public SuratKeluar $suratKeluar,
-        public string $tindakan = 'verifikasi'
+        public string $tindakan,
+        public ?string $olehNama = null
     ) {
     }
 
@@ -24,20 +32,34 @@ class SuratKeluarMenungguTindakan extends Notification
 
     public function toArray(object $notifiable): array
     {
-        $perluVerifikasi = $this->tindakan === 'verifikasi';
+        $oleh = $this->olehNama ? ' oleh ' . $this->olehNama : '';
+
+        [$judul, $pesan] = match ($this->tindakan) {
+            // Pada tahap ini surat belum bernomor, jadi yang dikenali penerima
+            // adalah perihal dan tujuannya - bukan nomornya.
+            'penomoran' => [
+                'Surat keluar menunggu penomoran Anda',
+                'Konsep "' . $this->suratKeluar->perihal . '" kepada '
+                    . $this->suratKeluar->tujuan . ' diajukan' . $oleh
+                    . ' dan menunggu penomoran serta pemeriksaan format.',
+            ],
+            'persetujuan' => [
+                'Surat keluar menunggu persetujuan Anda',
+                'Surat ' . $this->suratKeluar->label_nomor . ' kepada '
+                    . $this->suratKeluar->tujuan
+                    . ' sudah dinomori' . $oleh . ' dan menunggu persetujuan Anda.',
+            ],
+            default => throw new InvalidArgumentException(
+                'Tindakan surat keluar tidak dikenal: ' . $this->tindakan
+            ),
+        };
 
         return [
-            'tipe'             => $perluVerifikasi ? 'surat_keluar_perlu_verifikasi' : 'surat_keluar_perlu_persetujuan',
-            'surat_keluar_id'  => $this->suratKeluar->id,
-            'judul'            => $perluVerifikasi
-                ? 'Surat keluar menunggu verifikasi Anda'
-                : 'Surat keluar menunggu persetujuan Anda',
-            'pesan'            => 'Surat ' . $this->suratKeluar->nomor_surat
-                . ' kepada ' . $this->suratKeluar->tujuan
-                . ($perluVerifikasi
-                    ? ' menunggu verifikasi sebelum diajukan ke Direktur Utama.'
-                    : ' sudah diverifikasi direktur dan menunggu persetujuan Anda.'),
-            'url'              => route('surat-keluar.show', $this->suratKeluar->id),
+            'tipe'            => 'surat_keluar_perlu_' . $this->tindakan,
+            'surat_keluar_id' => $this->suratKeluar->id,
+            'judul'           => $judul,
+            'pesan'           => $pesan,
+            'url'             => route('surat-keluar.show', $this->suratKeluar->id),
         ];
     }
 }

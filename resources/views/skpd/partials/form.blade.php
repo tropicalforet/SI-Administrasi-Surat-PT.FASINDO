@@ -1,10 +1,8 @@
 {{--
-    Formulir SKPD. Mencakup dua macam penugasan: perjalanan dinas dan tugas
-    internal. Tujuan hanya diminta bila memang bepergian, sehingga penugasan
-    panitia internal tidak dipaksa mengisi kolom yang tidak relevan.
-
-    Toggle ditulis dengan JavaScript biasa karena layout memuat Tailwind lewat
-    CDN dan tidak menyertakan bundel Alpine.
+    Formulir SKPD. Satu macam dokumen saja: perjalanan dinas. Pilihan "tugas
+    internal" sempat ada saat modul Surat Tugas digabung ke sini, lalu dilepas
+    kembali karena SKPD memang surat keterangan perjalanan dinas - tujuan dan
+    lama perjalanan selalu relevan.
 --}}
 
 @if($users->isNotEmpty())
@@ -20,34 +18,18 @@
             @endforeach
         </select>
         <p class="text-xs text-slate-500 mt-1.5">
-            Anda menugaskan pegawai lain, sehingga dokumen ini tercatat sebagai penugasan.
+            @if(auth()->user()->isDirektur())
+                Daftar ini berisi tiga posisi di bawah Anda beserta diri Anda sendiri.
+            @else
+                Daftar ini berisi seluruh pegawai dalam struktur organisasi.
+            @endif
+            Memilih nama Anda sendiri membuat dokumen ini tercatat sebagai usulan, bukan penugasan.
         </p>
         @error('user_id')<p class="text-red-500 text-xs mt-1.5">{{ $message }}</p>@enderror
     </div>
 @endif
 
 <div>
-    <label class="block text-sm font-semibold text-slate-700 mb-2">Jenis Penugasan</label>
-
-    <div class="flex gap-2">
-        @foreach(\App\Models\Skpd::JENIS as $kode => $label)
-            <label class="flex-1 cursor-pointer">
-                <input type="radio" name="jenis" value="{{ $kode }}" class="sr-only peer js-jenis"
-                       {{ $nilai['jenis'] === $kode ? 'checked' : '' }}>
-                <div class="px-4 py-2.5 text-center text-sm font-semibold rounded-xl border transition-all bg-slate-50 border-slate-200 text-slate-600 peer-checked:bg-blue-600 peer-checked:text-white peer-checked:border-blue-600">
-                    {{ $label }}
-                </div>
-            </label>
-        @endforeach
-    </div>
-
-    <p class="text-xs text-slate-500 mt-1.5">
-        Tugas internal misalnya menjadi panitia acara kantor &mdash; tidak perlu tujuan perjalanan.
-    </p>
-    @error('jenis')<p class="text-red-500 text-xs mt-1.5">{{ $message }}</p>@enderror
-</div>
-
-<div id="wrapTujuan" class="{{ $nilai['jenis'] === 'perjalanan_dinas' ? '' : 'hidden' }}">
     <label class="block text-sm font-semibold text-slate-700 mb-2">Tujuan Perjalanan</label>
     <input type="text" name="tujuan_dinas" value="{{ $nilai['tujuan_dinas'] }}"
            placeholder="Contoh: Surabaya"
@@ -65,18 +47,14 @@
 
 <div class="grid grid-cols-1 md:grid-cols-2 gap-5">
     <div>
-        <label class="block text-sm font-semibold text-slate-700 mb-2">
-            <span class="js-label-mulai">{{ $nilai['jenis'] === 'perjalanan_dinas' ? 'Tanggal Berangkat' : 'Tanggal Mulai' }}</span>
-        </label>
+        <label class="block text-sm font-semibold text-slate-700 mb-2">Tanggal Berangkat</label>
         <input type="date" name="tanggal_berangkat" value="{{ $nilai['tanggal_berangkat'] }}" required
                class="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 focus:bg-white outline-none transition-all text-slate-800 @error('tanggal_berangkat') border-red-500 @enderror">
         @error('tanggal_berangkat')<p class="text-red-500 text-xs mt-1.5">{{ $message }}</p>@enderror
     </div>
 
     <div>
-        <label class="block text-sm font-semibold text-slate-700 mb-2">
-            <span class="js-label-selesai">{{ $nilai['jenis'] === 'perjalanan_dinas' ? 'Tanggal Kembali' : 'Tanggal Selesai' }}</span>
-        </label>
+        <label class="block text-sm font-semibold text-slate-700 mb-2">Tanggal Kembali</label>
         <input type="date" name="tanggal_kembali" value="{{ $nilai['tanggal_kembali'] }}" required
                class="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 focus:bg-white outline-none transition-all text-slate-800 @error('tanggal_kembali') border-red-500 @enderror">
         @error('tanggal_kembali')<p class="text-red-500 text-xs mt-1.5">{{ $message }}</p>@enderror
@@ -92,24 +70,3 @@
     <p class="text-xs text-slate-500 mt-2">Format: PDF, JPG, PNG (maks. 2 MB)</p>
     @error('file')<p class="text-red-500 text-xs mt-1.5">{{ $message }}</p>@enderror
 </div>
-
-<script>
-    (function () {
-        var pilihan = document.querySelectorAll('.js-jenis');
-        var wrapTujuan = document.getElementById('wrapTujuan');
-        var labelMulai = document.querySelector('.js-label-mulai');
-        var labelSelesai = document.querySelector('.js-label-selesai');
-
-        function segarkan() {
-            var terpilih = document.querySelector('.js-jenis:checked');
-            var perjalanan = !terpilih || terpilih.value === 'perjalanan_dinas';
-
-            wrapTujuan.classList.toggle('hidden', !perjalanan);
-            labelMulai.textContent = perjalanan ? 'Tanggal Berangkat' : 'Tanggal Mulai';
-            labelSelesai.textContent = perjalanan ? 'Tanggal Kembali' : 'Tanggal Selesai';
-        }
-
-        pilihan.forEach(function (r) { r.addEventListener('change', segarkan); });
-        segarkan();
-    })();
-</script>

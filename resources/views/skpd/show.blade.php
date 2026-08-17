@@ -1,4 +1,4 @@
-@extends('layouts.app')
+﻿@extends('layouts.app')
 
 @section('content')
 <style>
@@ -239,7 +239,7 @@
                 <div class="space-y-4 text-xs text-slate-600">
                     <div>
                         <span class="text-slate-400 font-bold block uppercase text-[9px] tracking-wider">Nomor SKPD</span>
-                        <span class="font-bold text-slate-800 text-sm block mt-0.5">{{ $skpd->nomor_skpd ?? 'Belum Terbit (Draft)' }}</span>
+                        <span class="font-bold text-slate-800 text-sm block mt-0.5">{{ $skpd->label_nomor }}</span>
                     </div>
                     <div>
                         <span class="text-slate-400 font-bold block uppercase text-[9px] tracking-wider">Pelaksana Dinas</span>
@@ -247,7 +247,7 @@
                     </div>
                     <div>
                         <span class="text-slate-400 font-bold block uppercase text-[9px] tracking-wider">Tujuan Dinas</span>
-                        <span class="font-semibold text-slate-800 block mt-0.5">{{ $skpd->berupaPerjalanan() ? $skpd->tujuan_dinas : '— (tugas internal)' }}</span>
+                        <span class="font-semibold text-slate-800 block mt-0.5">{{ $skpd->tujuan_dinas }}</span>
                     </div>
                     <div>
                         <span class="text-slate-400 font-bold block uppercase text-[9px] tracking-wider">Keperluan Dinas</span>

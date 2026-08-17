@@ -4,6 +4,7 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\SoftDeletes;
+use App\Models\User;
 
 class Disposisi extends Model
 {
@@ -30,6 +31,25 @@ class Disposisi extends Model
     ];
 
     /**
+     * Laporan Disposisi adalah alat kontrol manajemen, bukan alat kerja
+     * harian: isinya rekam jejak siapa memerintah siapa dan mana yang
+     * tertunda. Hanya Direktur Utama dan Sekretaris yang membacanya.
+     *
+     * Administrator ikut termasuk karena ia memegang seluruh sistem, sama
+     * seperti pada modul lain - bukan sebagai bagian dari manajemen.
+     *
+     * Aturannya berbasis jabatan, bukan izin per pengguna, karena itulah
+     * sifatnya: bukan sesuatu yang layak diberikan kepada seorang Direktur
+     * bidang lewat satu centang di menu Manajemen User.
+     */
+    public static function bolehLihatLaporan(User $user): bool
+    {
+        return in_array(strtolower($user->role), self::ROLE_LAPORAN);
+    }
+
+    public const ROLE_LAPORAN = ['dirut', 'sekretaris', 'admin', 'administrator', 'superadmin'];
+
+    /**
      * Masih ada disposisi lanjutan yang belum selesai.
      */
     public function punyaAnakBelumSelesai(): bool
@@ -43,6 +63,23 @@ class Disposisi extends Model
     public function semuaAnakSelesai(): bool
     {
         return $this->children()->exists() && !$this->punyaAnakBelumSelesai();
+    }
+
+    /**
+     * Nama pihak disposisi untuk ditampilkan.
+     *
+     * Pegawai yang sudah dihapus melepas penunjuknya menjadi kosong, tetapi
+     * disposisinya sendiri tetap tersimpan sebagai arsip. Label ini menjaga
+     * halaman tetap terbaca dan jujur menyebut bahwa orangnya tidak ada lagi.
+     */
+    public function getLabelPengirimAttribute(): string
+    {
+        return $this->dariUser?->name ?: 'Pengguna dihapus';
+    }
+
+    public function getLabelPenerimaAttribute(): string
+    {
+        return $this->kepadaUser?->name ?: 'Pengguna dihapus';
     }
 
     public function suratMasuk()

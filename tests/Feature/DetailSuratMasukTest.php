@@ -134,14 +134,15 @@ test('halaman buat surat tidak tertangkap route detail', function () {
     $this->actingAs($sekretaris)
         ->get('/surat-masuk/create')
         ->assertOk()
-        ->assertSee('Pilih Role Tujuan');
+        ->assertSee('Pilih Jabatan Tujuan');
 });
 
 test('tombol disposisikan hanya untuk yang berwenang', function () {
     $dirut = penerimaSurat('dirut', 'pimpinan');
     $pelaksana = penerimaSurat('staff', 'teknik');
 
-    $surat = suratDetail(['penerima_role' => 'staff', 'penerima' => 'Pelaksana / Admin']);
+    // Pelaksana dituju dengan namanya, bukan lewat jabatan
+    $surat = suratDetail(['penerima_id' => $pelaksana->id, 'penerima' => $pelaksana->name]);
 
     $this->actingAs($dirut)
         ->get('/surat-masuk/' . $surat->id)

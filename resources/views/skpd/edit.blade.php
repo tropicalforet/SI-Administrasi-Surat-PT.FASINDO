@@ -1,4 +1,4 @@
-@extends('layouts.app')
+﻿@extends('layouts.app')
 
 @section('content')
 <div class="py-10 px-4 sm:px-6 max-w-3xl mx-auto">
@@ -16,7 +16,7 @@
         <div class="mb-8 border-b border-slate-100 pb-5">
             <h2 class="text-2xl font-bold text-slate-800">Edit SKPD</h2>
             <p class="text-slate-500 text-sm mt-1.5">
-                Nomor <strong>{{ $skpd->nomor_skpd }}</strong> atas nama {{ $skpd->nama_pegawai }}.
+                Nomor <strong>{{ $skpd->label_nomor }}</strong> atas nama {{ $skpd->nama_pegawai }}.
             </p>
         </div>
 
@@ -41,7 +41,6 @@
                 'users' => collect(),
                 'nilai' => [
                     'user_id'           => $skpd->user_id,
-                    'jenis'             => old('jenis', $skpd->jenis),
                     'tujuan_dinas'      => old('tujuan_dinas', $skpd->tujuan_dinas),
                     'keperluan'         => old('keperluan', $skpd->keperluan),
                     'tanggal_berangkat' => old('tanggal_berangkat', $skpd->tanggal_berangkat),

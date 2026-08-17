@@ -1,4 +1,4 @@
-@extends('layouts.app')
+﻿@extends('layouts.app')
 
 @section('title', 'Laporan Surat Keterangan Perjalanan Dinas')
 
@@ -54,7 +54,7 @@
                     @forelse($data as $item)
                         <tr class="hover:bg-slate-50/80 transition-colors">
                             <td class="py-4 px-6">{{ $loop->iteration }}</td>
-                            <td class="py-4 px-6 font-medium text-slate-800">{{ $item->nomor_skpd }}</td>
+                            <td class="py-4 px-6 font-medium text-slate-800">{{ $item->label_nomor }}</td>
                             <td class="py-4 px-6">{{ $item->nama_pegawai }}</td>
                             <td class="py-4 px-6">{{ $item->tujuan_dinas }}</td>
                             <td class="py-4 px-6 whitespace-nowrap">{{ \Carbon\Carbon::parse($item->tanggal_berangkat)->translatedFormat('d M Y') }}</td>

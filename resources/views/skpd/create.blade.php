@@ -38,11 +38,10 @@
                 'users' => $users,
                 'nilai' => [
                     'user_id'           => old('user_id'),
-                    'jenis'             => old('jenis', 'perjalanan_dinas'),
                     'tujuan_dinas'      => old('tujuan_dinas'),
                     'keperluan'         => old('keperluan'),
-                    'tanggal_berangkat' => old('tanggal_berangkat'),
-                    'tanggal_kembali'   => old('tanggal_kembali'),
+                    'tanggal_berangkat' => old('tanggal_berangkat', now()->toDateString()),
+                    'tanggal_kembali'   => old('tanggal_kembali', now()->toDateString()),
                 ],
             ])
 

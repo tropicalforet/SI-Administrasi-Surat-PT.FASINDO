@@ -1,18 +1,9 @@
-<!DOCTYPE html>
-<html lang="id">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Edit Surat Masuk - E-Office</title>
-    <script src="https://cdn.tailwindcss.com"></script>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
-    <style>
-        body { font-family: 'Inter', sans-serif; }
-    </style>
-</head>
-<body class="bg-slate-50 text-slate-800 flex items-center justify-center min-h-screen p-4 sm:p-6">
+﻿@extends('layouts.app')
 
-    <div class="w-full max-w-xl">
+@section('content')
+<div class="py-10 px-4 sm:px-6 flex justify-center">
+
+<div class="w-full max-w-xl">
         
         <!-- Tombol Kembali -->
         <div class="mb-4">
@@ -232,5 +223,6 @@
             }
         }
     </script>
-</body>
-</html>
+
+</div>
+@endsection

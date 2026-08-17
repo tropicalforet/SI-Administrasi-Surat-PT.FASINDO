@@ -27,13 +27,14 @@
                             </button>
                         </form>
                     @endif
-                    @if(auth()->user()->role == 'sekretaris')
+                    {{-- Konsep surat kini disusun staf/manager, bukan hanya sekretaris --}}
+                    @if(true)
                         <a href="{{ route('surat-keluar.create') }}"
                            class="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white font-medium py-2.5 px-5 rounded-xl transition duration-200 shadow-md shadow-blue-500/20">
                             <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path>
                             </svg>
-                            Tambah Surat
+                            Susun Surat
                         </a>
                     @endif
                 </div>
@@ -58,7 +59,9 @@
                             class="px-4 py-2 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 focus:bg-white outline-none transition-all text-slate-800 text-sm cursor-pointer">
                         <option value="">Semua Status</option>
                         <option value="draft" {{ request('status') == 'draft' ? 'selected' : '' }}>Draft</option>
-                        <option value="menunggu_direktur" {{ request('status') == 'menunggu_direktur' ? 'selected' : '' }}>Menunggu Direktur</option>
+                        {{-- Tahap verifikasi direktur sudah dilepas dari alur; pilihannya
+                             dihapus karena tidak akan pernah cocok dengan surat mana pun. --}}
+                        <option value="menunggu_sekretaris" {{ request('status') == 'menunggu_sekretaris' ? 'selected' : '' }}>Menunggu Sekretaris</option>
                         <option value="menunggu_dirut" {{ request('status') == 'menunggu_dirut' ? 'selected' : '' }}>Menunggu Dirut</option>
                         <option value="terkirim" {{ request('status') == 'terkirim' ? 'selected' : '' }}>Terkirim (Disetujui)</option>
                         <option value="ditolak" {{ request('status') == 'ditolak' ? 'selected' : '' }}>Ditolak</option>
@@ -111,7 +114,7 @@
                             </td>
 
                             <td class="py-4 px-6 font-semibold text-slate-800">
-                                {{ $item->nomor_surat }}
+                                {{ $item->label_nomor }}
                             </td>
 
                             <td class="py-4 px-6 whitespace-nowrap text-slate-500">
@@ -136,6 +139,10 @@
                                 @elseif($item->status == 'menunggu_direktur')
                                     <span class="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold bg-orange-50 text-orange-700 border border-orange-200">
                                         Menunggu Direktur
+                                    </span>
+                                @elseif($item->status == 'menunggu_sekretaris')
+                                    <span class="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold bg-purple-50 text-purple-700 border border-purple-200">
+                                        Menunggu Sekretaris
                                     </span>
                                 @elseif($item->status == 'menunggu_dirut')
                                     <span class="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold bg-blue-50 text-blue-700 border border-blue-200">
@@ -175,7 +182,14 @@
                                         Detail
                                     </a>
 
-                                    @if(auth()->user()->role == 'sekretaris')
+                                    {{-- Penyusun konsep mengurus draf miliknya sendiri; sekretaris
+                                         tetap dapat membantu merapikan surat siapa pun. --}}
+                                    @php
+                                        $bolehUrus = strtolower(auth()->user()->role) === 'sekretaris'
+                                            || $item->dibuat_oleh === auth()->id();
+                                    @endphp
+
+                                    @if($bolehUrus)
                                         @if(in_array($item->status, ['draft', 'ditolak']))
                                             <a href="{{ route('surat-keluar.edit', $item->id) }}"
                                                class="bg-amber-50 text-amber-600 hover:bg-amber-100 border border-amber-100 px-3 py-1.5 rounded-md text-xs font-semibold transition-colors">
@@ -184,7 +198,7 @@
 
                                             <form action="{{ route('surat-keluar.submit', $item->id) }}"
                                                   method="POST"
-                                                  onsubmit="event.preventDefault(); ConfirmModal.show({title:'Ajukan Persetujuan',message:'Surat ini akan dikirim ke Direktur Utama untuk ditinjau dan ditandatangani. Lanjutkan?',variant:'info',confirmText:'Ya, Ajukan'}).then(ok=>{if(ok)this.submit()})"
+                                                  onsubmit="event.preventDefault(); ConfirmModal.show({title:'Ajukan Persetujuan',message:'Konsep ini akan dikirim ke direktur bidang untuk diperiksa. Lanjutkan?',variant:'info',confirmText:'Ya, Ajukan'}).then(ok=>{if(ok)this.submit()})"
                                                   class="inline">
                                                 @csrf
                                                 @method('PUT')
@@ -229,9 +243,7 @@
                                 <div class="flex flex-col items-center justify-center text-slate-400">
                                     <svg class="w-12 h-12 mb-3 text-slate-300" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8"></path></svg>
                                     <p class="text-slate-500 font-medium">Belum ada data surat keluar.</p>
-                                    @if(auth()->user()->role == 'sekretaris')
-                                        <p class="text-sm mt-1">Silakan klik tambah surat keluar baru untuk memulai.</p>
-                                    @endif
+                                    <p class="text-sm mt-1">Klik "Susun Surat" untuk membuat konsep baru.</p>
                                 </div>
                             </td>
                         </tr>

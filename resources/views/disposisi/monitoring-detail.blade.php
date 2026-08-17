@@ -1,4 +1,4 @@
-@php
+﻿@php
     if (!function_exists('collectDisposisiChain')) {
         function collectDisposisiChain($node) {
             $items = [$node];
@@ -13,19 +13,10 @@
         return strcmp($a->tanggal_disposisi, $b->tanggal_disposisi);
     });
 @endphp
-<!DOCTYPE html>
-<html lang="id">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Detail Monitoring Disposisi - E-Office</title>
-    <script src="https://cdn.tailwindcss.com"></script>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
-    <style>
-        body { font-family: 'Inter', sans-serif; }
-    </style>
-</head>
-<body class="bg-slate-50 text-slate-800 p-4 sm:p-6 lg:p-8 min-h-screen">
+@extends('layouts.app')
+
+@section('content')
+<div class="p-4 sm:p-6 lg:p-8">
 
 <div class="max-w-7xl mx-auto">
 
@@ -91,9 +82,9 @@
                         <span class="block text-xs font-semibold text-slate-500 mb-1">Ditujukan Kepada</span>
                         <div class="flex items-center gap-2 mt-1">
                             <div class="w-6 h-6 rounded-full bg-slate-200 flex items-center justify-center text-slate-500 text-xs font-bold">
-                                {{ substr($disposisi->kepadaUser->name, 0, 1) }}
+                                {{ substr($disposisi->label_penerima, 0, 1) }}
                             </div>
-                            <span class="font-medium text-slate-800">{{ $disposisi->kepadaUser->name }}</span>
+                            <span class="font-medium text-slate-800">{{ $disposisi->label_penerima }}</span>
                         </div>
                     </div>
                 </div>
@@ -169,9 +160,9 @@
                                     <div class="flex flex-col sm:flex-row sm:justify-between sm:items-start gap-3 mb-4 pl-2">
                                         <div>
                                             <div class="flex items-center gap-2 flex-wrap">
-                                                <span class="font-bold text-slate-800 text-sm sm:text-base">{{ $item->dariUser->name }}</span>
+                                                <span class="font-bold text-slate-800 text-sm sm:text-base">{{ $item->label_pengirim }}</span>
                                                 <svg class="w-4 h-4 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14 5l7 7m0 0l-7 7m7-7H3"></path></svg>
-                                                <span class="font-bold text-slate-800 text-sm sm:text-base">{{ $item->kepadaUser->name }}</span>
+                                                <span class="font-bold text-slate-800 text-sm sm:text-base">{{ $item->label_penerima }}</span>
                                             </div>
                                             <p class="text-[10px] text-slate-400 mt-1 flex items-center gap-1">
                                                 <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"></path></svg>
@@ -254,5 +245,5 @@
 
 </div>
 
-</body>
-</html>
+</div>
+@endsection

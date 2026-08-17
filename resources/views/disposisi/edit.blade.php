@@ -1,16 +1,7 @@
-<!DOCTYPE html>
-<html lang="id">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Tindak Lanjut Disposisi - E-Office</title>
-    <script src="https://cdn.tailwindcss.com"></script>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
-    <style>
-        body { font-family: 'Inter', sans-serif; }
-    </style>
-</head>
-<body class="bg-slate-50 text-slate-800 p-4 sm:p-6 lg:p-8">
+﻿@extends('layouts.app')
+
+@section('content')
+<div class="p-4 sm:p-6 lg:p-8">
 
 <div class="max-w-7xl mx-auto">
 
@@ -82,8 +73,8 @@
                             <div class="flex flex-col sm:flex-row sm:items-start gap-1 sm:gap-4">
                                 <span class="font-semibold text-slate-600 sm:w-1/3">Dari Disposisi</span>
                                 <span class="text-slate-800 sm:w-2/3 flex items-center gap-2">
-                                    <span class="w-6 h-6 rounded-full bg-blue-100 text-blue-600 flex items-center justify-center text-xs font-bold">{{ substr($disposisi->dariUser->name, 0, 1) }}</span>
-                                    {{ $disposisi->dariUser->name }}
+                                    <span class="w-6 h-6 rounded-full bg-blue-100 text-blue-600 flex items-center justify-center text-xs font-bold">{{ substr($disposisi->label_pengirim, 0, 1) }}</span>
+                                    {{ $disposisi->label_pengirim }}
                                 </span>
                             </div>
 
@@ -181,7 +172,7 @@
                     
                     <div>
                         <label class="block text-sm font-semibold text-slate-700 mb-2">
-                            Instruksi Disposisi <span class="text-slate-400 font-normal">(Dari {{ $disposisi->dariUser->name }})</span>
+                            Instruksi Disposisi <span class="text-slate-400 font-normal">(Dari {{ $disposisi->label_pengirim }})</span>
                         </label>
                         <textarea readonly
                                   rows="8"
@@ -291,9 +282,9 @@
                         <div class="flex flex-col sm:flex-row sm:justify-between sm:items-start gap-4 mb-4">
                             <div>
                                 <h3 class="font-bold text-slate-800 text-base flex items-center gap-2 flex-wrap">
-                                    {{ $item->dariUser->name }}
+                                    {{ $item->label_pengirim }}
                                     <svg class="w-4 h-4 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 8l4 4m0 0l-4 4m4-4H3"></path></svg>
-                                    {{ $item->kepadaUser->name }}
+                                    {{ $item->label_penerima }}
                                 </h3>
                                 <p class="text-xs text-slate-500 mt-1 flex items-center gap-1.5">
                                     <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"></path></svg>
@@ -341,5 +332,5 @@
 
 </div>
 
-</body>
-</html>
+</div>
+@endsection

@@ -1,8 +1,8 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="id">
 <head>
     <meta charset="UTF-8">
-    <title>SKPD - {{ $skpd->nomor_skpd }}</title>
+    <title>SKPD - {{ $skpd->label_nomor }}</title>
     <style>
         @page {
             size: A4 portrait;
@@ -108,7 +108,7 @@
             Surat Keterangan Perjalanan Dinas
         </h2>
         <p class="text-[11pt] mt-1 m-0">
-            Nomor : {{ $skpd->nomor_skpd }}
+            Nomor : {{ $skpd->label_nomor }}
         </p>
     </div>
 

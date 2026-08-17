@@ -1,4 +1,4 @@
-@extends('layouts.app')
+﻿@extends('layouts.app')
 
 @section('content')
 <div class="p-4 sm:p-6 lg:p-8">
@@ -66,9 +66,9 @@
                         <td class="py-4 px-6 whitespace-nowrap">
                             <div class="flex items-center gap-2">
                                 <div class="w-7 h-7 rounded-full bg-blue-100 text-blue-600 flex items-center justify-center font-bold text-xs">
-                                    {{ substr($item->dariUser->name, 0, 1) }}
+                                    {{ substr($item->label_pengirim, 0, 1) }}
                                 </div>
-                                <span class="font-medium text-slate-700">{{ $item->dariUser->name }}</span>
+                                <span class="font-medium text-slate-700">{{ $item->label_pengirim }}</span>
                             </div>
                         </td>
 

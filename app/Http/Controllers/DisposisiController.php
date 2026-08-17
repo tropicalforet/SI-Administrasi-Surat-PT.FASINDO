@@ -13,8 +13,24 @@ use Illuminate\Support\Facades\Storage; // <-- Dipakai saat mengganti file tinda
 
 class DisposisiController extends Controller
 {
+    /**
+     * Mendisposisikan surat mensyaratkan hak membacanya lebih dulu.
+     *
+     * Tanpa penjagaan ini, siapa pun yang punya izin disposisi dapat membuka
+     * surat yang bukan urusannya hanya dengan menebak nomor id - halaman
+     * formnya sendiri sudah menampilkan pengirim dan perihal surat.
+     */
+    private function pastikanBolehMendisposisikan(SuratMasuk $suratMasuk): void
+    {
+        if (!$suratMasuk->bolehDibacaOleh(auth()->user())) {
+            abort(403, 'Akses ditolak. Surat ini bukan kewenangan Anda.');
+        }
+    }
+
     public function create(SuratMasuk $suratMasuk)
     {
+        $this->pastikanBolehMendisposisikan($suratMasuk);
+
         $users = $this->tujuanDisposisi(auth()->user());
 
         if ($users->isEmpty() && !in_array(strtolower(auth()->user()->role), ['dirut', 'sekretaris'])) {
@@ -84,6 +100,12 @@ class DisposisiController extends Controller
             'instruksi'      => 'required|string',
             'batas_waktu'    => 'nullable|date|after_or_equal:today',
         ]);
+
+        // Form boleh saja tidak pernah ditampilkan, tetapi POST langsung tetap
+        // harus ditolak - di sinilah disposisi benar-benar tercipta.
+        $this->pastikanBolehMendisposisikan(
+            SuratMasuk::findOrFail($request->surat_masuk_id)
+        );
 
         // Gunakan DB Transaction agar penyimpanan disposisi dan log berjalan bersamaan (aman)
         DB::transaction(function () use ($request) {
@@ -227,11 +249,23 @@ class DisposisiController extends Controller
         }
     }
 
-    public function monitoring()
+    /**
+     * Monitoring memakai daftar yang sama dengan Laporan Disposisi.
+     *
+     * Sebelumnya administrator diloloskan middleware tetapi ditolak di sini,
+     * sehingga menunya terlihat lalu berujung 403 saat diklik. Perbandingannya
+     * juga tidak menormalkan huruf besar-kecil seperti bagian lain sistem.
+     */
+    private function pastikanBolehMemantau(): void
     {
-        if (auth()->user()->role != 'dirut' && auth()->user()->role != 'sekretaris') {
+        if (!Disposisi::bolehLihatLaporan(auth()->user())) {
             abort(403, 'Akses khusus Direktur Utama dan Sekretaris.');
         }
+    }
+
+    public function monitoring()
+    {
+        $this->pastikanBolehMemantau();
 
         $data = Disposisi::with([
                 'suratMasuk',
@@ -249,9 +283,7 @@ class DisposisiController extends Controller
 
     public function showMonitoring(Disposisi $disposisi)
     {
-        if (auth()->user()->role != 'dirut' && auth()->user()->role != 'sekretaris') {
-            abort(403);
-        }
+        $this->pastikanBolehMemantau();
 
         $disposisi->load([
             'suratMasuk',

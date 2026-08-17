@@ -13,7 +13,7 @@
             </div>
             <div>
                 <p class="text-lg font-semibold text-slate-800">{{ auth()->user()->name }}</p>
-                <p class="text-sm text-slate-500">{{ ucfirst(auth()->user()->role) }} &middot; {{ auth()->user()->email }}</p>
+                <p class="text-sm text-slate-500">{{ auth()->user()->label_jabatan }} &middot; {{ auth()->user()->email }}</p>
             </div>
         </div>
     </div>

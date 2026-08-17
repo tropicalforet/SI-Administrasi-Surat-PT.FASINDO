@@ -1,4 +1,4 @@
-@extends('layouts.app')
+﻿@extends('layouts.app')
 
 @section('content')
 <div class="p-4 sm:p-6 lg:p-8">
@@ -9,7 +9,9 @@
             <div class="p-6 border-b border-slate-100 flex flex-col md:flex-row justify-between items-center gap-4 bg-white">
                 @php
                     $peran = strtolower(auth()->user()->role);
-                    $atasan = in_array($peran, ['dirut', 'direktur1', 'direktur2', 'sekretaris']);
+                    // Direktur bidang menyetujui, tidak menerbitkan penugasan,
+                    // jadi ajakannya sama dengan pegawai: mengajukan usulan.
+                    $atasan = \App\Models\Skpd::bolehMenugaskan(auth()->user());
                 @endphp
 
                 <div>
@@ -50,7 +52,7 @@
                         <tr class="bg-slate-50 text-slate-500 text-xs uppercase tracking-wider border-b border-slate-200">
                             <th class="py-4 px-6 font-semibold w-16">No</th>
                             <th class="py-4 px-6 font-semibold">No. SKPD</th>
-                            <th class="py-4 px-6 font-semibold">Jenis</th>
+                            <th class="py-4 px-6 font-semibold">Asal</th>
                             @if(in_array(strtolower(auth()->user()->role), ['sekretaris', 'dirut']))
                                 <th class="py-4 px-6 font-semibold">Diajukan Oleh</th>
                             @endif
@@ -71,14 +73,11 @@
                             </td>
 
                             <td class="py-4 px-6 font-semibold text-slate-800">
-                                {{ $item->nomor_skpd }}
+                                {{ $item->label_nomor }}
                             </td>
 
                             <td class="py-4 px-6 text-slate-500">
-                                {{ $item->label_jenis }}
-                                @if($item->asal_usul === 'usulan')
-                                    <span class="block text-[10px] font-bold uppercase tracking-wider text-slate-400 mt-0.5">Usulan</span>
-                                @endif
+                                {{ $item->label_asal_usul }}
                             </td>
 
                             @if(in_array(strtolower(auth()->user()->role), ['sekretaris', 'dirut']))
@@ -93,7 +92,7 @@
 
                             <td class="py-4 px-6">
                                 <span class="line-clamp-2" title="{{ $item->tujuan_dinas }}">
-                                    {{ $item->berupaPerjalanan() ? $item->tujuan_dinas : '—' }}
+                                    {{ $item->tujuan_dinas }}
                                 </span>
                             </td>
 

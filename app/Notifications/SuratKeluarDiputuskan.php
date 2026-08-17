@@ -4,11 +4,17 @@ namespace App\Notifications;
 
 use App\Models\SuratKeluar;
 use Illuminate\Notifications\Notification;
+use InvalidArgumentException;
 
+/**
+ * Pemberitahuan atas keputusan yang sudah diambil terhadap sebuah surat.
+ * Untuk mengabarkan giliran yang belum dikerjakan, pakai
+ * SuratKeluarMenungguTindakan.
+ */
 class SuratKeluarDiputuskan extends Notification
 {
     /**
-     * @param  string  $keputusan  'diverifikasi', 'disetujui', atau 'ditolak'.
+     * @param  string  $keputusan  'disetujui' atau 'ditolak'.
      */
     public function __construct(
         public SuratKeluar $suratKeluar,
@@ -24,23 +30,25 @@ class SuratKeluarDiputuskan extends Notification
 
     public function toArray(object $notifiable): array
     {
-        $nomor = $this->suratKeluar->nomor_surat;
+        $nomor = $this->suratKeluar->label_nomor;
         $oleh = $this->olehNama ? ' oleh ' . $this->olehNama : '';
 
+        // Setiap keputusan disebut tegas. Dulu arm terakhir berupa default,
+        // sehingga keputusan yang tidak dikenal ikut berbunyi "dikembalikan"
+        // dan pengajuan konsep terbaca sebagai penolakan di layar sekretaris.
         [$judul, $pesan] = match ($this->keputusan) {
-            'diverifikasi'   => [
-                'Surat keluar sudah diverifikasi',
-                'Surat ' . $nomor . ' telah diverifikasi' . $oleh . ' dan diteruskan ke Direktur Utama.',
-            ],
             'disetujui' => [
                 'Surat keluar disetujui',
                 'Surat ' . $nomor . ' telah disetujui dan ditandatangani' . $oleh . '.',
             ],
-            default     => [
+            'ditolak' => [
                 'Surat keluar dikembalikan untuk revisi',
                 'Surat ' . $nomor . ' dikembalikan' . $oleh . '. Catatan: '
                     . ($this->suratKeluar->catatan_revisi ?: '-'),
             ],
+            default => throw new InvalidArgumentException(
+                'Keputusan surat keluar tidak dikenal: ' . $this->keputusan
+            ),
         };
 
         return [
