@@ -34,6 +34,9 @@ test('kartu surat keluar menghitung status yang benar-benar dipakai', function (
         ->assertViewHas('totalDitolak', 1);
 });
 
+// Status yang dipakai di sini harus yang benar-benar dikenal sistem.
+// Sebelumnya tes ini memakai 'diperiksa' - status yang tidak pernah ada -
+// sehingga ia menguji perilaku yang tidak pernah terjadi.
 function skpdBerstatus(string $status, string $nomor, User $pemilik): void
 {
     $suratTugas = App\Models\SuratTugas::create([
@@ -64,8 +67,8 @@ test('kartu skpd menghitung seluruh pengajuan untuk dirut', function () {
     $dirut = User::factory()->create(['role' => 'dirut']);
     $staff = User::factory()->create(['role' => 'staff']);
 
-    skpdBerstatus('diperiksa', '001', $staff);
-    skpdBerstatus('diperiksa', '002', $staff);
+    skpdBerstatus('menunggu_dirut', '001', $staff);
+    skpdBerstatus('menunggu_dirut', '002', $staff);
     skpdBerstatus('disetujui', '003', $staff);
     skpdBerstatus('ditolak', '004', $staff);
 
@@ -86,7 +89,7 @@ test('kartu skpd pegawai hanya menghitung pengajuannya sendiri', function () {
     $staff = User::factory()->create(['role' => 'staff']);
     $lain = User::factory()->create(['role' => 'staff']);
 
-    skpdBerstatus('diperiksa', '001', $staff);
+    skpdBerstatus('menunggu_dirut', '001', $staff);
     skpdBerstatus('disetujui', '002', $staff);
     skpdBerstatus('disetujui', '003', $lain);
     skpdBerstatus('ditolak', '004', $lain);

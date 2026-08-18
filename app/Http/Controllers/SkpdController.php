@@ -138,7 +138,12 @@ class SkpdController extends Controller
 
             $direktur->notify(new SkpdMenungguTindakan($skpd, 'persetujuan_direktur'));
 
-            ActivityHelper::log('Ajukan SKPD', 'Mengajukan ' . $skpd->nomor_skpd . ' untuk persetujuan ' . $direktur->label_jabatan);
+            // Dokumen belum bernomor pada tahap ini - nomor baru terbit saat
+            // Direktur Utama menyetujui - sehingga yang dicatat perihalnya.
+            ActivityHelper::log(
+                'Ajukan SKPD',
+                'Mengajukan usulan dinas ke ' . $skpd->tujuan_dinas . ' untuk persetujuan ' . $direktur->label_jabatan
+            );
 
             return redirect()->route('skpd.show', $skpd->id)
                 ->with('success', 'Diajukan ke ' . $direktur->label_jabatan . ' untuk disetujui.');
@@ -147,10 +152,23 @@ class SkpdController extends Controller
         $skpd->update(['status' => 'menunggu_dirut', 'catatan_revisi' => null]);
         $this->beritahuDirut($skpd);
 
-        ActivityHelper::log('Ajukan SKPD', 'Mengajukan ' . $skpd->nomor_skpd . ' untuk persetujuan Direktur Utama');
+        // Bila Direktur Utama sendiri yang menerbitkan penugasannya, tahap
+        // berikutnya adalah penandatanganan - bukan permintaan persetujuan
+        // kepada dirinya sendiri.
+        $miliknyaSendiri = (int) $skpd->ditugaskan_oleh === (int) auth()->id()
+            && strtolower(auth()->user()->role) === 'dirut';
+
+        ActivityHelper::log(
+            'Ajukan SKPD',
+            $miliknyaSendiri
+                ? 'Menerbitkan penugasan dinas ke ' . $skpd->tujuan_dinas . ', siap ditandatangani'
+                : 'Mengajukan penugasan dinas ke ' . $skpd->tujuan_dinas . ' untuk persetujuan Direktur Utama'
+        );
 
         return redirect()->route('skpd.show', $skpd->id)
-            ->with('success', 'Diajukan ke Direktur Utama untuk disetujui.');
+            ->with('success', $miliknyaSendiri
+                ? 'Penugasan diterbitkan. Tinggal dibubuhi tanda tangan elektronik Anda.'
+                : 'Diajukan ke Direktur Utama untuk disetujui.');
     }
 
     /**
@@ -196,13 +214,19 @@ class SkpdController extends Controller
 
     private function pastikanBolehMengurus(Skpd $skpd): void
     {
-        $role = strtolower(auth()->user()->role);
+        // Draf hanya boleh diurus penyusunnya. Orang lain bahkan tidak
+        // melihatnya, sehingga tidak sepantasnya dapat mengubah atau
+        // mengajukan dokumen yang masih disusun orang.
+        if ($skpd->status === 'draft') {
+            abort_unless($skpd->dibuatOleh(auth()->user()), 403, 'Akses ditolak.');
 
-        if ($role !== 'sekretaris'
-            && $skpd->user_id !== auth()->id()
-            && $skpd->ditugaskan_oleh !== auth()->id()) {
-            abort(403, 'Akses ditolak.');
+            return;
         }
+
+        // Selebihnya pun hanya penyusunnya. Pegawai yang ditugaskan boleh
+        // melihat dokumennya, tetapi tidak mengubah atau mengajukan perintah
+        // yang bukan ia yang menyusunnya.
+        abort_unless($skpd->dibuatOleh(auth()->user()), 403, 'Akses ditolak.');
     }
 
     public function show(Skpd $skpd)
@@ -398,7 +422,10 @@ class SkpdController extends Controller
         $role = strtolower(auth()->user()->role ?? '');
         $isAdmin = in_array($role, ['admin', 'administrator', 'superadmin']);
 
-        if (!$isAdmin && $skpd->user_id !== auth()->id()) {
+        // Yang berhak membatalkan adalah penyusunnya. Pada penugasan, kolom
+        // user_id menunjuk pegawai yang ditugaskan - bila itu yang dipakai,
+        // seorang bawahan dapat menghapus perintah yang diberikan atasannya.
+        if (!$isAdmin && !$skpd->dibuatOleh(auth()->user())) {
             abort(403, 'Akses ditolak. Anda tidak memiliki izin untuk menghapus data SKPD ini.');
         }
 

@@ -130,17 +130,21 @@ class SuratKeluarController extends Controller
         // Nomor hanya diterbitkan sekali; pengajuan ulang memakai nomor yang sama.
         $nomor = $surat_keluar->nomor_surat ?: $this->terbitkanNomor($surat_keluar);
 
-        // Nomor disematkan ke dokumen Word sekarang, bukan saat draf dibuat,
-        // karena saat itu nomornya memang belum ada.
-        if ($surat_keluar->file && str_ends_with(strtolower($surat_keluar->file), '.docx')) {
-            $this->imprintNomorSuratToWord(storage_path('app/public/' . $surat_keluar->file), $nomor);
-            $this->convertDocxToPdf($surat_keluar->file);
-        }
-
+        // Nomor disimpan lebih dahulu, sebelum berkasnya diolah. Urutan ini
+        // penting: bila pengolahan dokumen gagal, nomor yang sudah terbit
+        // tetap melekat pada suratnya. Sebelumnya urutannya terbalik,
+        // sehingga satu kegagalan menghanguskan nomor yang sudah diambil dari
+        // penghitung dan meninggalkan lubang pada urutan nomor.
         $surat_keluar->update([
             'nomor_surat' => $nomor,
             'status'      => 'menunggu_dirut',
         ]);
+
+        // Penyematan nomor ke dokumen Word bersifat usaha terbaik.
+        if ($surat_keluar->file && str_ends_with(strtolower($surat_keluar->file), '.docx')) {
+            $this->imprintNomorSuratToWord(Storage::disk('public')->path($surat_keluar->file), $nomor);
+            $this->convertDocxToPdf($surat_keluar->file);
+        }
 
         $this->beritahuDirut($surat_keluar);
 
@@ -231,7 +235,7 @@ class SuratKeluarController extends Controller
             $filePath = $file->storeAs('surat_keluar', $fileName, 'public');
 
             if (strtolower($file->getClientOriginalExtension()) === 'docx') {
-                $fullPath = storage_path('app/public/' . $filePath);
+                $fullPath = Storage::disk('public')->path($filePath);
                 $this->imprintNomorSuratToWord($fullPath, $surat_keluar->nomor_surat);
                 $this->convertDocxToPdf($filePath);
             }
@@ -350,7 +354,7 @@ class SuratKeluarController extends Controller
             
             // PROSES E-SIGN JIKA BERKAS ADALAH WORD (.docx)
             if ($surat_keluar->file) {
-                $fullPath = storage_path('app/public/' . $surat_keluar->file);
+                $fullPath = Storage::disk('public')->path($surat_keluar->file);
                 $ext = strtolower(pathinfo($fullPath, PATHINFO_EXTENSION));
                 
                 if ($ext === 'docx' && file_exists($fullPath)) {
@@ -408,7 +412,10 @@ class SuratKeluarController extends Controller
                                 'file' => $pdfRelativePath
                             ]);
                         }
-                    } catch (\Exception $e) {
+                    } catch (\Throwable $e) {
+                        // \Throwable, bukan \Exception: fungsi yang dimatikan
+                        // peladen melempar \Error, dan \Error tidak akan
+                        // tertangkap oleh catch (\Exception).
                         \Log::error('Gagal menyisipkan E-Sign ke berkas DOCX: ' . $e->getMessage());
                     }
                 }
@@ -478,7 +485,7 @@ class SuratKeluarController extends Controller
             abort(404, 'Berkas tidak ditemukan.');
         }
 
-        $filePath = storage_path('app/public/' . $surat_keluar->file);
+        $filePath = Storage::disk('public')->path($surat_keluar->file);
         
         if (!file_exists($filePath)) {
             abort(404, 'Berkas fisik tidak ditemukan di server.');
@@ -550,9 +557,23 @@ class SuratKeluarController extends Controller
         return view('surat_keluar.verify', compact('surat_keluar'));
     }
 
+    /**
+     * Konversi dokumen Word ke PDF, bila peladen menyediakan LibreOffice.
+     *
+     * Bersifat usaha terbaik: pada layanan shared hosting, shell_exec umumnya
+     * dimatikan lewat disable_functions dan LibreOffice tidak terpasang.
+     * Kegagalan di sini tidak boleh menghentikan alur persuratan, karena
+     * dokumen Word-nya sendiri sudah tersimpan dan tetap dapat diunduh.
+     */
     private function convertDocxToPdf($docxRelativePath)
     {
-        $fullPath = storage_path('app/public/' . $docxRelativePath);
+        // Memanggil fungsi yang dimatikan peladen berakibat fatal pada PHP 8,
+        // dan tanda @ tidak meredamnya. Karena itu diperiksa lebih dahulu.
+        if (!function_exists('shell_exec')) {
+            return false;
+        }
+
+        $fullPath = Storage::disk('public')->path($docxRelativePath);
         if (!file_exists($fullPath)) {
             return false;
         }
@@ -593,7 +614,7 @@ class SuratKeluarController extends Controller
             $templateProcessor->setValue('no_surat', $nomorSurat);
             $templateProcessor->saveAs($fullPath);
             return true;
-        } catch (\Exception $e) {
+        } catch (\Throwable $e) {
             return false;
         }
     }

@@ -208,12 +208,44 @@ class Skpd extends Model
      * seorang pun melihat draf orang lain, termasuk pimpinan dan
      * administrator. Dipakai bersama oleh daftar SKPD dan laporan.
      */
+    /**
+     * Siapa yang menyusun dokumen ini.
+     *
+     * Pada penugasan, penyusunnya adalah atasan yang memerintahkan - bukan
+     * pegawai yang ditugaskan. Pada usulan, keduanya orang yang sama.
+     */
+    public function dibuatOleh(?User $user): bool
+    {
+        if (!$user) {
+            return false;
+        }
+
+        return $this->ditugaskan_oleh
+            ? (int) $this->ditugaskan_oleh === (int) $user->id
+            : (int) $this->user_id === (int) $user->id;
+    }
+
+    /**
+     * Draf adalah kertas kerja penyusunnya dan belum menjadi dokumen kantor.
+     *
+     * Pegawai yang ditugaskan pun belum boleh melihatnya: selama atasannya
+     * masih menyusun, belum ada perintah apa pun yang perlu ia ketahui.
+     * Penugasan baru muncul di layarnya setelah benar-benar diajukan.
+     */
     public function scopeTanpaDrafOrangLain($query, User $user)
     {
         return $query->where(function ($q) use ($user) {
             $q->where('status', '!=', 'draft')
-              ->orWhere('user_id', $user->id)
-              ->orWhere('ditugaskan_oleh', $user->id);
+              ->orWhere(function ($draf) use ($user) {
+                  $draf->where('status', 'draft')
+                       ->where(function ($penyusun) use ($user) {
+                           $penyusun->where('ditugaskan_oleh', $user->id)
+                                    ->orWhere(function ($usulan) use ($user) {
+                                        $usulan->whereNull('ditugaskan_oleh')
+                                               ->where('user_id', $user->id);
+                                    });
+                       });
+              });
         });
     }
 
@@ -242,33 +274,83 @@ class Skpd extends Model
      * Direktur wajib dapat melihat penugasan pegawai di unitnya - tanpa ini
      * ia diberi kewajiban menyetujui dokumen yang tidak dapat ia buka.
      */
+    /**
+     * Siapa yang boleh melihat sebuah pengajuan, pada tahap apa.
+     *
+     * Tiga pihak, masing-masing dengan alasannya sendiri:
+     *
+     *   Penyusun    - selalu melihat dokumennya, pada tahap apa pun. Pada
+     *                 penugasan penyusunnya atasan, pada usulan pegawainya.
+     *
+     *   Penerima    - pegawai yang ditugaskan baru melihatnya setelah dokumen
+     *                 resmi terbit. Sebelum ditandatangani, penugasan masih
+     *                 dokumen atasan yang menyusunnya, bukan miliknya. Ia belum
+     *                 perlu tahu, dan tidak sepantasnya dapat mengubah apa pun.
+     *
+     *   Pemeriksa   - pimpinan dan direktur bidang, atas dokumen yang sudah
+     *                 diajukan, karena merekalah yang memutuskan. Dokumen atas
+     *                 nama direkturnya sendiri tidak masuk hitungan ini; yang
+     *                 itu tunduk pada dua aturan di atas.
+     */
     public function scopeTerlihatOleh($query, User $user)
     {
-        $query->tanpaDrafOrangLain($user);
+        $pimpinan = in_array(
+            strtolower($user->role),
+            ['admin', 'administrator', 'superadmin', 'dirut', 'sekretaris']
+        );
 
-        if (in_array(strtolower($user->role), ['admin', 'administrator', 'superadmin', 'dirut', 'sekretaris'])) {
-            return $query;
-        }
+        return $query->where(function ($q) use ($user, $pimpinan) {
+            $q->where(fn ($penyusun) => $this->saringPenyusun($penyusun, $user));
 
-        return $query->where(function ($q) use ($user) {
-            $q->where('user_id', $user->id)
-              ->orWhere('ditugaskan_oleh', $user->id);
+            $q->orWhere(function ($penerima) use ($user) {
+                $penerima->where('user_id', $user->id)
+                         ->whereNotNull('ditugaskan_oleh')
+                         ->where('status', 'disetujui');
+            });
 
-            if ($user->isDirektur() && $user->unit) {
-                $q->orWhereHas('user', fn ($sq) => $sq->where('unit', $user->unit));
+            if ($pimpinan) {
+                $q->orWhere('status', '!=', 'draft');
+            } elseif ($user->isDirektur() && $user->unit) {
+                $q->orWhere(function ($direktorat) use ($user) {
+                    $direktorat->where('status', '!=', 'draft')
+                               ->where('user_id', '!=', $user->id)
+                               ->whereHas('user', fn ($sq) => $sq->where('unit', $user->unit));
+                });
             }
         });
     }
 
+    /** Penyusun dokumen: atasan pada penugasan, pegawainya sendiri pada usulan. */
+    private function saringPenyusun($query, User $user)
+    {
+        return $query->where('ditugaskan_oleh', $user->id)
+            ->orWhere(function ($usulan) use ($user) {
+                $usulan->whereNull('ditugaskan_oleh')->where('user_id', $user->id);
+            });
+    }
+
+    /**
+     * Kembaran scopeTerlihatOleh untuk satu dokumen. Keduanya wajib sepakat,
+     * agar tidak ada dokumen yang tampil di daftar tetapi ditolak saat dibuka,
+     * atau sebaliknya.
+     */
     public function dapatDilihatOleh(User $user): bool
     {
-        if ($this->user_id === $user->id || $this->ditugaskan_oleh === $user->id) {
+        // Penyusunnya, pada tahap apa pun.
+        if ($this->dibuatOleh($user)) {
             return true;
         }
 
-        // Draf orang lain tertutup bagi siapa pun.
+        // Draf tertutup bagi siapa pun selain penyusunnya.
         if ($this->status === 'draft') {
             return false;
+        }
+
+        // Pegawai yang ditugaskan: hanya setelah dokumennya resmi terbit.
+        if ((int) $this->user_id === (int) $user->id) {
+            return $this->merupakanPenugasan()
+                ? $this->status === 'disetujui'
+                : true;
         }
 
         if (in_array(strtolower($user->role), ['admin', 'administrator', 'superadmin', 'dirut', 'sekretaris'])) {
@@ -278,6 +360,12 @@ class Skpd extends Model
         return $user->isDirektur()
             && $user->unit
             && $this->user?->unit === $user->unit;
+    }
+
+    /** Penugasan datang dari atasan, bukan diusulkan pegawainya sendiri. */
+    public function merupakanPenugasan(): bool
+    {
+        return (bool) $this->ditugaskan_oleh;
     }
 
     public function getVerifyTokenAttribute()

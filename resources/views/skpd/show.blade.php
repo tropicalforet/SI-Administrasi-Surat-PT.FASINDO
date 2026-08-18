@@ -88,14 +88,32 @@
             
             <!-- REJECTION ALERT BOX (no-print) -->
             @if(strtolower($skpd->status) === 'ditolak' && $skpd->catatan_revisi)
+                @php
+                    /*
+                     * Tautan perbaikan mengikuti kewenangan yang sudah berlaku di
+                     * controller: sekretaris, pegawai yang ditugaskan, dan atasan
+                     * yang menugaskan. Sebelumnya tautan ini hanya tampil bagi
+                     * pegawainya, sehingga pada penugasan dari atasan justru orang
+                     * yang tidak menulis dokumennya yang diminta memperbaiki,
+                     * sementara penulisnya tidak melihat tautan apa pun.
+                     */
+                    $bolehMemperbaiki = strtolower(auth()->user()->role) === 'sekretaris'
+                        || (int) $skpd->user_id === (int) auth()->id()
+                        || (int) $skpd->ditugaskan_oleh === (int) auth()->id();
+
+                    $penulisnyaSendiri = (int) $skpd->ditugaskan_oleh === (int) auth()->id();
+                @endphp
+
                 <div class="p-5 bg-red-50 border border-red-200 rounded-xl flex gap-3 no-print">
                     <svg class="w-6 h-6 text-red-600 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path></svg>
                     <div>
-                        <h4 class="text-md font-bold text-red-800 text-sm">Status: Ditolak / Perlu Revisi</h4>
+                        <h4 class="text-md font-bold text-red-800 text-sm">
+                            {{ $penulisnyaSendiri ? 'Status: Dikembalikan untuk Diperbaiki' : 'Status: Ditolak / Perlu Revisi' }}
+                        </h4>
                         <p class="text-xs text-red-700 mt-1 font-medium italic">"{{ $skpd->catatan_revisi }}"</p>
-                        @if(($skpd->user_id ?? null) === auth()->id())
+                        @if($bolehMemperbaiki)
                             <a href="{{ route('skpd.edit', $skpd->id) }}" class="inline-flex items-center gap-1.5 mt-3 text-xs font-bold text-red-600 hover:text-red-800 underline">
-                                Edit & Perbaiki Sekarang
+                                {{ $penulisnyaSendiri ? 'Perbaiki Dokumen Ini' : 'Edit & Perbaiki Sekarang' }}
                                 <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path></svg>
                             </a>
                         @endif
@@ -119,11 +137,17 @@
 
             @if($bolehAjukan)
                 <div class="bg-white rounded-2xl shadow-sm border border-slate-200 p-6 no-print">
-                    <h3 class="text-base font-bold text-slate-800 mb-2">Ajukan Penugasan</h3>
+                    <h3 class="text-base font-bold text-slate-800 mb-2">
+                        {{ $skpd->asal_usul === 'usulan' ? 'Ajukan Usulan' : 'Terbitkan Penugasan' }}
+                    </h3>
                     <p class="text-xs text-slate-500 mb-5 leading-relaxed">
-                        {{ $skpd->asal_usul === 'usulan'
-                            ? 'Usulan ini akan diteruskan ke direktur unit Anda untuk disetujui lebih dulu.'
-                            : 'Penugasan ini akan diteruskan ke pejabat berwenang untuk disetujui.' }}
+                        @if($skpd->asal_usul === 'usulan')
+                            Usulan ini akan diteruskan ke direktur unit Anda untuk disetujui lebih dulu.
+                        @elseif($peran === 'dirut')
+                            Penugasan ini akan diteruskan untuk ditandatangani secara elektronik. Sebagai pemberi tugas sekaligus penanda tangan, keputusannya ada di tangan Anda.
+                        @else
+                            Penugasan ini akan diteruskan kepada Direktur Utama untuk ditandatangani.
+                        @endif
                     </p>
 
                     <form action="{{ route('skpd.ajukan', $skpd->id) }}" method="POST"
@@ -186,22 +210,44 @@
 
             <!-- APPROVAL ACTION CARD FOR DIRUT (no-print) -->
             @if(strtolower(auth()->user()->role) === 'dirut' && $skpd->status === 'menunggu_dirut')
+                @php
+                    /*
+                     * Bila Direktur Utama sendiri yang menerbitkan penugasan ini,
+                     * keputusannya sudah diambil saat perintah itu dibuat. Yang
+                     * tersisa hanyalah menerbitkan dan menandatangani dokumennya,
+                     * sehingga kata "menyetujui" keliru - seolah ia menyetujui
+                     * perintahnya sendiri. Alurnya tidak berubah, hanya sebutannya
+                     * yang disesuaikan dengan perbuatan yang sebenarnya terjadi.
+                     */
+                    $menandatanganiPerintahSendiri =
+                        (int) $skpd->ditugaskan_oleh === (int) auth()->id();
+                @endphp
+
                 <div class="bg-white rounded-2xl shadow-sm border border-slate-200 p-6 no-print">
-                    <h3 class="text-base font-bold text-slate-800 mb-2">Persetujuan Dokumen SKPD</h3>
-                    <p class="text-xs text-slate-500 mb-6 leading-relaxed">Sebagai Direktur Utama, Anda dapat menyetujui dokumen perjalanan dinas ini atau mengembalikannya untuk direvisi.</p>
-                    
+                    <h3 class="text-base font-bold text-slate-800 mb-2">
+                        {{ $menandatanganiPerintahSendiri ? 'Penerbitan Dokumen SKPD' : 'Persetujuan Dokumen SKPD' }}
+                    </h3>
+                    <p class="text-xs text-slate-500 mb-6 leading-relaxed">
+                        @if($menandatanganiPerintahSendiri)
+                            Penugasan ini Anda terbitkan sendiri. Bubuhkan tanda tangan elektronik agar dokumennya resmi berlaku, atau kembalikan untuk diperbaiki.
+                        @else
+                            Sebagai Direktur Utama, Anda dapat menyetujui dokumen perjalanan dinas ini atau mengembalikannya untuk direvisi.
+                        @endif
+                    </p>
+
                     <div class="flex flex-col gap-4">
                         <div class="flex items-center gap-3">
-                            <form action="{{ route('skpd.approve', $skpd->id) }}" method="POST" onsubmit="event.preventDefault(); ConfirmModal.show({title:'Setujui SKPD',message:'Dokumen SKPD ini akan disetujui dan ditandatangani secara digital (E-Sign). Lanjutkan?',variant:'approve',confirmText:'Ya, Setujui & E-Sign'}).then(ok=>{if(ok)this.submit()})" class="inline">
+                            <form action="{{ route('skpd.approve', $skpd->id) }}" method="POST"
+                                  onsubmit="event.preventDefault(); ConfirmModal.show({title:'{{ $menandatanganiPerintahSendiri ? 'Terbitkan & Tanda Tangani' : 'Setujui SKPD' }}',message:'Dokumen SKPD ini akan {{ $menandatanganiPerintahSendiri ? 'diterbitkan' : 'disetujui' }} dan ditandatangani secara digital (E-Sign). Lanjutkan?',variant:'approve',confirmText:'{{ $menandatanganiPerintahSendiri ? 'Ya, Terbitkan & Tanda Tangani' : 'Ya, Setujui & E-Sign' }}'}).then(ok=>{if(ok)this.submit()})" class="inline">
                                 @csrf
                                 @method('PUT')
                                 <button type="submit" class="bg-emerald-600 hover:bg-emerald-700 text-white font-semibold py-2.5 px-5 rounded-xl transition duration-200 shadow-md shadow-emerald-500/10 text-xs cursor-pointer">
-                                    Setujui SKPD
+                                    {{ $menandatanganiPerintahSendiri ? 'Terbitkan & Tanda Tangani' : 'Setujui SKPD' }}
                                 </button>
                             </form>
                             
                             <button onclick="document.getElementById('reject-form-container').classList.toggle('hidden')" class="bg-red-50 hover:bg-red-100 text-red-600 font-semibold py-2.5 px-5 border border-red-100 rounded-xl transition duration-200 text-xs cursor-pointer">
-                                Tolak / Perlu Revisi
+                                {{ $menandatanganiPerintahSendiri ? 'Kembalikan untuk Diperbaiki' : 'Tolak / Perlu Revisi' }}
                             </button>
                         </div>
 
@@ -210,16 +256,29 @@
                                 @csrf
                                 @method('PUT')
                                 <label class="block text-xs font-semibold text-slate-700 mb-2">
-                                    Alasan Penolakan / Catatan Revisi <span class="text-red-500">*</span>
+                                    {{ $menandatanganiPerintahSendiri ? 'Catatan Perbaikan' : 'Alasan Penolakan / Catatan Revisi' }}
+                                    <span class="text-red-500">*</span>
                                 </label>
-                                <textarea name="catatan_revisi" rows="3" required placeholder="Tuliskan detail poin revisi atau alasan penolakan..." class="w-full px-4 py-2 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-red-500 focus:border-red-500 focus:bg-white outline-none transition-all text-slate-800 text-xs resize-none"></textarea>
+
+                                @if($menandatanganiPerintahSendiri)
+                                    {{-- Catatan ini bukan memo untuk diri sendiri: ia melekat pada
+                                         dokumen, terbaca pegawai yang ditugaskan, dan tersimpan pada
+                                         catatan aktivitas sebagai alasan dokumen ditarik kembali. --}}
+                                    <p class="text-[11px] text-slate-400 mb-2 leading-relaxed">
+                                        Catatan ini terbaca oleh {{ $skpd->nama_pegawai ?? 'pegawai yang ditugaskan' }}
+                                        dan tersimpan pada riwayat dokumen sebagai alasan penarikan.
+                                    </p>
+                                @endif
+                                <textarea name="catatan_revisi" rows="3" required
+                                          placeholder="{{ $menandatanganiPerintahSendiri ? 'Tuliskan bagian yang perlu diperbaiki pada penugasan ini...' : 'Tuliskan detail poin revisi atau alasan penolakan...' }}"
+                                          class="w-full px-4 py-2 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-red-500 focus:border-red-500 focus:bg-white outline-none transition-all text-slate-800 text-xs resize-none"></textarea>
                                 
                                 <div class="flex justify-end gap-3 mt-3">
                                     <button type="button" onclick="document.getElementById('reject-form-container').classList.add('hidden')" class="px-3 py-1.5 text-xs font-semibold text-slate-500 hover:text-slate-700">
                                         Batal
                                     </button>
                                     <button type="submit" class="bg-red-600 hover:bg-red-700 text-white font-semibold py-1.5 px-3 rounded-lg text-xs shadow-md shadow-red-500/10">
-                                        Kirim Penolakan
+                                        {{ $menandatanganiPerintahSendiri ? 'Kembalikan Dokumen' : 'Kirim Penolakan' }}
                                     </button>
                                 </div>
                             </form>

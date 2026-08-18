@@ -6,13 +6,27 @@
     if (auth()->check()) {
         $notifikasiBelumDibaca = auth()->user()->unreadNotifications()->count();
         $userRole = strtolower(auth()->user()->role);
-        if ($userRole === 'sekretaris') {
-            // SKPD baru selalu tersimpan dengan status 'diperiksa'; status
-            // 'pengajuan' hanya default kolom lama yang tidak pernah dipakai.
-            $skpdPendingCount = \App\Models\Skpd::where('status', 'diperiksa')->count();
-        } elseif ($userRole === 'dirut') {
-            $skpdPendingCount = \App\Models\Skpd::where('status', 'diperiksa')->count();
+
+        /*
+         * Lencana menghitung dokumen yang menunggu tindakan pengguna ini,
+         * bukan sekadar dokumen yang sedang berjalan. Sebelumnya keduanya
+         * mencari status 'diperiksa' - status yang tidak pernah dipakai -
+         * sehingga angkanya selamanya nol.
+         *
+         * Sekretaris tidak lagi muncul di sini: ia tidak punya tahap apa pun
+         * pada alur SKPD sejak kewenangan menugaskan dipegang Dirut dan para
+         * direktur.
+         */
+        if ($userRole === 'dirut') {
+            $skpdPendingCount = \App\Models\Skpd::where('status', 'menunggu_dirut')->count();
             $suratKeluarPendingCount = \App\Models\SuratKeluar::where('status', 'menunggu_dirut')->count();
+        } elseif ($userRole === 'sekretaris') {
+            $suratKeluarPendingCount = \App\Models\SuratKeluar::where('status', 'menunggu_sekretaris')->count();
+        } elseif (auth()->user()->isDirektur() && auth()->user()->unit) {
+            // Direktur bidang menilai usulan pegawai di direktoratnya sendiri.
+            $skpdPendingCount = \App\Models\Skpd::where('status', 'menunggu_direktur')
+                ->whereHas('user', fn ($q) => $q->where('unit', auth()->user()->unit))
+                ->count();
         }
         $disposisiPendingCount = \App\Models\Disposisi::where('kepada_user_id', auth()->id())->where('status', 'menunggu')->count();
     }

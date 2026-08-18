@@ -78,6 +78,13 @@
 
                             <td class="py-4 px-6 text-slate-500">
                                 {{ $item->label_asal_usul }}
+                                @if($item->ditugaskanOleh)
+                                    {{-- Tanpa nama pemberi tugas, penugasan terbaca seolah
+                                         diajukan sendiri oleh pegawai yang namanya tercantum. --}}
+                                    <span class="block text-[11px] text-slate-400 mt-0.5">
+                                        oleh {{ $item->ditugaskanOleh->name }}
+                                    </span>
+                                @endif
                             </td>
 
                             @if(in_array(strtolower(auth()->user()->role), ['sekretaris', 'dirut']))
@@ -131,10 +138,16 @@
                                     </a>
 
                                     @php
+                                        /*
+                                         * Yang boleh mengubah dan membatalkan adalah penyusunnya.
+                                         * Dulu dipakai kolom user_id, yang pada penugasan menunjuk
+                                         * pegawai yang ditugaskan - sehingga bawahan memperoleh
+                                         * tombol Hapus atas perintah yang diberikan atasannya.
+                                         */
                                         $role = strtolower(auth()->user()->role);
-                                        $isOwner = ($item->user_id ?? null) === auth()->id();
-                                        $canEdit = ($role === 'sekretaris' || ($isOwner && in_array($item->status, ['draft', 'ditolak'])));
-                                        $canDelete = ($role === 'sekretaris' || $isOwner);
+                                        $penyusunnya = $item->dibuatOleh(auth()->user());
+                                        $canEdit = $penyusunnya && in_array($item->status, ['draft', 'ditolak']);
+                                        $canDelete = $penyusunnya && $item->status !== 'disetujui';
                                     @endphp
 
                                     @if($canEdit)

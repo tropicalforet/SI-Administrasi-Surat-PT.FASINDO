@@ -146,7 +146,7 @@ test('draf skpd tidak terlihat pimpinan maupun direktur unitnya', function () {
     expect($draf->dapatDilihatOleh($pegawai))->toBeTrue();
 });
 
-test('atasan tetap melihat draf penugasan yang ia susun sendiri', function () {
+test('draf penugasan belum terlihat pegawai yang akan ditugaskan', function () {
     $direktur = pemilikDraf('direktur2', ['akses_skpd'], 'teknik');
     $bawahan = pemilikDraf('manager', ['akses_skpd'], 'teknik');
 
@@ -161,7 +161,103 @@ test('atasan tetap melihat draf penugasan yang ia susun sendiri', function () {
 
     $draf = Skpd::first();
 
+    // Selama atasannya masih menyusun, belum ada perintah apa pun yang perlu
+    // diketahui bawahannya. Dulu bawahan sudah melihatnya karena kolom user_id
+    // menunjuk kepadanya, padahal penyusunnya adalah atasan.
     expect($draf->status)->toBe('draft')
+        ->and($draf->dibuatOleh($direktur))->toBeTrue()
         ->and($draf->dapatDilihatOleh($direktur))->toBeTrue()
-        ->and($draf->dapatDilihatOleh($bawahan))->toBeTrue();
+        ->and($draf->dapatDilihatOleh($bawahan))->toBeFalse();
+
+    $this->actingAs($bawahan)
+        ->get('/skpd/' . $draf->id)
+        ->assertForbidden();
+
+    $this->actingAs($bawahan)
+        ->get('/skpd')
+        ->assertOk()
+        ->assertDontSee('Penugasan yang masih disusun');
+});
+
+test('penugasan baru muncul di layar pegawai setelah dokumennya terbit', function () {
+    $direktur = pemilikDraf('direktur2', ['akses_skpd'], 'teknik');
+    $bawahan = pemilikDraf('manager', ['akses_skpd'], 'teknik');
+    pemilikDraf('dirut', ['akses_skpd'], 'pimpinan');
+
+    $this->actingAs($direktur)->post('/skpd', [
+        'user_id'           => $bawahan->id,
+        'keperluan'         => 'Penugasan yang masih disusun',
+        'tujuan_dinas'      => 'Surabaya',
+        'tanggal_berangkat' => '2026-09-01',
+        'tanggal_kembali'   => '2026-09-03',
+        'aksi'              => 'draft',
+    ]);
+
+    $draf = Skpd::first();
+    $this->actingAs($direktur)->put('/skpd/' . $draf->id . '/ajukan');
+
+    // Diajukan saja belum cukup. Selama Direktur Utama belum menandatangani,
+    // perintahnya belum resmi dan belum perlu diketahui pegawainya.
+    expect($draf->fresh()->dapatDilihatOleh($bawahan))->toBeFalse();
+
+    $this->actingAs($bawahan)
+        ->get('/skpd/' . $draf->id)
+        ->assertForbidden();
+
+    $draf->update(['status' => 'disetujui']);
+
+    expect($draf->fresh()->dapatDilihatOleh($bawahan))->toBeTrue();
+
+    $this->actingAs($bawahan)
+        ->get('/skpd/' . $draf->id)
+        ->assertOk();
+});
+
+test('pegawai tidak dapat mengajukan draf penugasan yang belum selesai disusun', function () {
+    $direktur = pemilikDraf('direktur2', ['akses_skpd'], 'teknik');
+    $bawahan = pemilikDraf('manager', ['akses_skpd'], 'teknik');
+    pemilikDraf('dirut', ['akses_skpd'], 'pimpinan');
+
+    $this->actingAs($direktur)->post('/skpd', [
+        'user_id'           => $bawahan->id,
+        'keperluan'         => 'Penugasan yang masih disusun',
+        'tujuan_dinas'      => 'Surabaya',
+        'tanggal_berangkat' => '2026-09-01',
+        'tanggal_kembali'   => '2026-09-03',
+        'aksi'              => 'draft',
+    ]);
+
+    $draf = Skpd::first();
+
+    // Yang tidak terlihat, tidak pula boleh diurus.
+    $this->actingAs($bawahan)
+        ->put('/skpd/' . $draf->id . '/ajukan')
+        ->assertForbidden();
+
+    expect($draf->fresh()->status)->toBe('draft');
+});
+
+test('sekretaris pun tidak melihat draf skpd orang lain', function () {
+    $pegawai = pemilikDraf('staff', ['akses_skpd']);
+    $sekretaris = pemilikDraf('sekretaris', ['akses_skpd'], 'pimpinan');
+
+    $draf = Skpd::create([
+        'user_id'           => $pegawai->id,
+        'asal_usul'         => 'usulan',
+        'nama_pegawai'      => $pegawai->name,
+        'tujuan_dinas'      => 'Kota Rahasia',
+        'keperluan'         => 'Rencana yang belum diajukan',
+        'tanggal_berangkat' => '2026-09-01',
+        'tanggal_kembali'   => '2026-09-02',
+        'status'            => 'draft',
+    ]);
+
+    $this->actingAs($sekretaris)
+        ->get('/skpd')
+        ->assertOk()
+        ->assertDontSee('Rencana yang belum diajukan');
+
+    $this->actingAs($sekretaris)
+        ->put('/skpd/' . $draf->id . '/ajukan')
+        ->assertForbidden();
 });

@@ -54,7 +54,32 @@
                         @elseif($isDocx)
                             @php
                                 $companionPdf = str_replace('.docx', '.pdf', $surat_keluar->file);
-                                $hasCompanion = file_exists(storage_path('app/public/' . $companionPdf));
+                                // Diperiksa lewat disk, bukan jalur yang ditulis langsung, agar
+                                // ikut mengikuti letak penyimpanan yang diatur pada .env.
+                                $hasCompanion = \Illuminate\Support\Facades\Storage::disk('public')->exists($companionPdf);
+
+                                /*
+                                 * Peramban tidak dapat membuka dokumen Word, dan konversi ke PDF
+                                 * memerlukan LibreOffice yang tidak tersedia pada shared hosting.
+                                 * Sebagai gantinya dokumen ditampilkan lewat penampil Microsoft
+                                 * Office Online, yang mengambil berkasnya dari alamat publik.
+                                 *
+                                 * Penanda versi diambil dari waktu perubahan terakhir. Tanpa itu,
+                                 * penampil Microsoft menyajikan hasil render lamanya, sehingga
+                                 * dokumen sesudah ditandatangani masih terlihat seperti sebelumnya.
+                                 */
+                                $alamatBerkas = asset('storage/' . $surat_keluar->file)
+                                    . '?v=' . optional($surat_keluar->updated_at)->timestamp;
+
+                                // Penampil Microsoft harus dapat menjangkau alamatnya dari luar,
+                                // sehingga tidak berfungsi saat dijalankan di komputer sendiri.
+                                $alamatTerjangkau = !preg_match(
+                                    '#^https?://(localhost|127\.0\.0\.1|\[::1\]|.*\.test)#i',
+                                    (string) config('app.url')
+                                );
+
+                                $penampilOffice = 'https://view.officeapps.live.com/op/embed.aspx?src='
+                                    . urlencode($alamatBerkas);
                             @endphp
 
                             @if($hasCompanion)
@@ -72,6 +97,34 @@
                                     <div class="w-full h-[650px] rounded-xl overflow-hidden border border-slate-200 shadow-inner">
                                         <iframe src="{{ asset('storage/'.$companionPdf) }}" class="w-full h-full" frameborder="0"></iframe>
                                     </div>
+                                </div>
+                            @elseif($alamatTerjangkau)
+                                <div class="space-y-3">
+                                    <div class="flex items-center justify-between bg-slate-50 border border-slate-200 rounded-xl p-3 text-xs text-slate-600">
+                                        <span class="flex items-center gap-1.5 font-medium text-slate-700">
+                                            <span class="w-2.5 h-2.5 rounded-full bg-blue-500 animate-pulse"></span>
+                                            @if($surat_keluar->status === 'terkirim')
+                                                Dokumen Final &mdash; Nomor, E-Sign, dan QR Code sudah tersemat
+                                            @else
+                                                Pratinjau Draf &mdash; belum bernomor dan belum ditandatangani
+                                            @endif
+                                        </span>
+                                        <a href="{{ route('surat-keluar.download', $surat_keluar->id) }}" class="text-blue-600 hover:text-blue-800 font-semibold flex items-center gap-1">
+                                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"></path></svg>
+                                            Unduh Berkas DOCX Asli
+                                        </a>
+                                    </div>
+
+                                    <div class="w-full h-[650px] rounded-xl overflow-hidden border border-slate-200 shadow-inner bg-slate-100">
+                                        <iframe src="{{ $penampilOffice }}"
+                                                class="w-full h-full" frameborder="0"
+                                                title="Pratinjau dokumen surat keluar"></iframe>
+                                    </div>
+
+                                    <p class="text-[11px] text-slate-400 leading-relaxed">
+                                        Dokumen Word ditampilkan melalui penampil Microsoft Office Online karena peramban
+                                        tidak dapat membukanya secara langsung. Memerlukan sambungan internet.
+                                    </p>
                                 </div>
                             @else
                                 <div class="py-16 border border-slate-200 rounded-xl flex flex-col items-center justify-center text-slate-500 bg-slate-50">
