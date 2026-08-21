@@ -44,6 +44,8 @@
                     ? match($data['tipe'] ?? '') {
                         'disposisi_terlambat', 'disposisi_eskalasi' => 'bg-red-600 text-white',
                         'disposisi_mendekati_tenggat' => 'bg-amber-500 text-white',
+                        // Perintah dinas menuntut tindakan, bukan sekadar kabar.
+                        'skpd_penugasan_diterima' => 'bg-emerald-600 text-white',
                         default => 'bg-blue-600 text-white',
                     }
                     : 'bg-slate-100 text-slate-400';

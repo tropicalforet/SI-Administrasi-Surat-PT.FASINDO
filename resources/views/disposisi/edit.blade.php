@@ -81,13 +81,9 @@
                             <div class="flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-4">
                                 <span class="font-semibold text-slate-600 sm:w-1/3">Status Saat Ini</span>
                                 <div class="sm:w-2/3">
-                                    @if($disposisi->status == 'menunggu')
-                                        <span class="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold bg-yellow-50 text-yellow-700 border border-yellow-200">Menunggu</span>
-                                    @elseif($disposisi->status == 'diproses')
-                                        <span class="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold bg-blue-50 text-blue-700 border border-blue-200">Diproses</span>
-                                    @else
-                                        <span class="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200">Selesai</span>
-                                    @endif
+                                    <span class="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold border {{ $disposisi->warna_status }}">
+                                        {{ $disposisi->label_status }}
+                                    </span>
                                 </div>
                             </div>
 
@@ -163,7 +159,53 @@
 
             <hr class="my-10 border-slate-100">
 
+            @php
+                $bolehMengerjakan = $disposisi->bolehDitindaklanjutiOleh(auth()->user());
+            @endphp
+
+            {{-- Catatan dari pemberi disposisi saat pekerjaannya dikembalikan.
+                 Tanpa ini penerima hanya melihat statusnya mundur, tanpa tahu
+                 apa yang perlu diperbaiki. --}}
+            @if($disposisi->catatan_verifikasi && $bolehMengerjakan)
+                <div class="mb-8 rounded-xl border border-amber-200 bg-amber-50 p-5">
+                    <p class="text-sm font-bold text-amber-800">
+                        Dikembalikan oleh {{ $disposisi->label_pengirim }}
+                    </p>
+                    <p class="mt-1.5 text-sm text-amber-900 leading-relaxed">
+                        {{ $disposisi->catatan_verifikasi }}
+                    </p>
+                </div>
+            @endif
+
+            @unless($bolehMengerjakan)
+                <div class="mb-8 rounded-xl border border-slate-200 bg-slate-50 p-5">
+                    <p class="text-sm font-bold text-slate-700">
+                        @if($disposisi->menungguVerifikasi())
+                            Menunggu verifikasi {{ $disposisi->label_pengirim }}
+                        @elseif($disposisi->sudahSelesai())
+                            Disposisi ini sudah selesai
+                        @else
+                            Disposisi ini bukan tugas Anda
+                        @endif
+                    </p>
+                    <p class="mt-1.5 text-sm text-slate-600 leading-relaxed">
+                        @if($disposisi->menungguVerifikasi())
+                            Anda sudah menyatakan pekerjaan ini rampung. Selama diperiksa,
+                            isinya tidak dapat diubah. Bila ada yang perlu diperbaiki,
+                            {{ $disposisi->label_pengirim }} akan mengembalikannya beserta catatan.
+                        @elseif($disposisi->sudahSelesai())
+                            Tindak lanjutnya telah diverifikasi
+                            {{ $disposisi->label_pengirim }} dan dinyatakan selesai,
+                            sehingga tidak lagi dapat diubah.
+                        @else
+                            Yang berhak mengisi tindak lanjut hanya penerima disposisinya.
+                        @endif
+                    </p>
+                </div>
+            @endunless
+
             <!-- Form Update Status & Tindak Lanjut -->
+            @if($bolehMengerjakan)
             <form action="{{ route('disposisi.update', $disposisi->id) }}" method="POST" enctype="multipart/form-data">
                 @csrf
                 @method('PUT')
@@ -188,11 +230,19 @@
                                     class="w-full px-4 py-3 bg-white border border-slate-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all text-slate-800 cursor-pointer shadow-sm @error('status') border-red-500 focus:ring-red-500 @enderror">
                                 <option value="menunggu" {{ old('status', $disposisi->status) == 'menunggu' ? 'selected' : '' }}>Menunggu</option>
                                 <option value="diproses" {{ old('status', $disposisi->status) == 'diproses' ? 'selected' : '' }}>Diproses</option>
-                                <option value="selesai" {{ old('status', $disposisi->status) == 'selesai' ? 'selected' : '' }}>Selesai</option>
+                                {{-- Penerima tidak menutup sendiri disposisinya.
+                                     Ia menyatakan pekerjaannya rampung, lalu
+                                     pemberi disposisi yang memutuskan. --}}
+                                <option value="menunggu_verifikasi" {{ old('status', $disposisi->status) == 'menunggu_verifikasi' ? 'selected' : '' }}>
+                                    Selesai &mdash; kirim untuk diverifikasi
+                                </option>
                             </select>
                             @error('status')
                                 <p class="text-red-500 text-xs mt-1.5">{{ $message }}</p>
                             @enderror
+                            <p class="text-xs text-slate-500 mt-1.5">
+                                Disposisi baru berstatus Selesai setelah {{ $disposisi->label_pengirim }} memverifikasi hasilnya.
+                            </p>
                         </div>
 
                         <div>
@@ -255,6 +305,7 @@
                     </button>
                 </div>
             </form>
+            @endif
         </div>
     </div>
 

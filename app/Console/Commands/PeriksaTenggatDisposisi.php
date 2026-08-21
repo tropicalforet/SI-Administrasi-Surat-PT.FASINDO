@@ -35,7 +35,7 @@ class PeriksaTenggatDisposisi extends Command
         $daftar = Disposisi::with(['suratMasuk', 'kepadaUser'])
             ->whereNotNull('batas_waktu')
             ->whereNull('diingatkan_pada')
-            ->where('status', '!=', 'selesai')
+            ->whereNotIn('status', Disposisi::STATUS_RAMPUNG)
             ->whereDate('batas_waktu', '>=', $hariIni)
             ->whereDate('batas_waktu', '<=', $hariIni->copy()->addDay())
             ->get();
@@ -60,7 +60,7 @@ class PeriksaTenggatDisposisi extends Command
         $daftar = Disposisi::with(['suratMasuk', 'kepadaUser', 'dariUser'])
             ->whereNotNull('batas_waktu')
             ->whereNull('dieskalasi_pada')
-            ->where('status', '!=', 'selesai')
+            ->whereNotIn('status', Disposisi::STATUS_RAMPUNG)
             ->whereDate('batas_waktu', '<', $hariIni)
             ->get();
 

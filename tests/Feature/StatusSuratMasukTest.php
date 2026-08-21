@@ -65,16 +65,22 @@ test('surat menjadi selesai setelah seluruh disposisinya selesai', function () {
 
     $disposisi = Disposisi::where('surat_masuk_id', $surat->id)->get();
 
+    // Disposisi baru tuntas setelah pemberinya memverifikasi, sehingga tiap
+    // disposisi melewati dua langkah.
+    $this->actingAs($direkturA)->put('/disposisi/' . $disposisi[0]->id, ['status' => 'menunggu_verifikasi']);
+    $this->actingAs($dirut)->put('/disposisi/' . $disposisi[0]->id . '/verifikasi');
+
     // Satu selesai: surat masih berjalan
-    $this->actingAs($direkturA)->put('/disposisi/' . $disposisi[0]->id, ['status' => 'selesai']);
     expect($surat->fresh()->status)->toBe('didisposisikan');
 
+    $this->actingAs($direkturB)->put('/disposisi/' . $disposisi[1]->id, ['status' => 'menunggu_verifikasi']);
+    $this->actingAs($dirut)->put('/disposisi/' . $disposisi[1]->id . '/verifikasi');
+
     // Seluruhnya selesai: surat tuntas
-    $this->actingAs($direkturB)->put('/disposisi/' . $disposisi[1]->id, ['status' => 'selesai']);
     expect($surat->fresh()->status)->toBe('selesai');
 });
 
-test('surat kembali berjalan bila disposisi dibuka lagi', function () {
+test('surat kembali berjalan bila pekerjaannya dikembalikan pemberi disposisi', function () {
     $dirut = User::factory()->create(['role' => 'dirut']);
     $direktur = penerimaDisposisi('direktur1');
     $surat = suratMasukStatus();
@@ -87,11 +93,42 @@ test('surat kembali berjalan bila disposisi dibuka lagi', function () {
 
     $disposisi = Disposisi::where('surat_masuk_id', $surat->id)->first();
 
-    $this->actingAs($direktur)->put('/disposisi/' . $disposisi->id, ['status' => 'selesai']);
-    expect($surat->fresh()->status)->toBe('selesai');
-
-    $this->actingAs($direktur)->put('/disposisi/' . $disposisi->id, ['status' => 'diproses']);
+    // Dinyatakan rampung, tetapi belum diverifikasi: surat belum boleh tuntas.
+    $this->actingAs($direktur)->put('/disposisi/' . $disposisi->id, ['status' => 'menunggu_verifikasi']);
     expect($surat->fresh()->status)->toBe('didisposisikan');
+
+    $this->actingAs($dirut)->put('/disposisi/' . $disposisi->id . '/verifikasi');
+    expect($surat->fresh()->status)->toBe('selesai');
+});
+
+test('disposisi yang sudah diverifikasi tidak dapat dibuka kembali', function () {
+    $dirut = User::factory()->create(['role' => 'dirut']);
+    $direktur = penerimaDisposisi('direktur1');
+    $surat = suratMasukStatus();
+
+    $this->actingAs($dirut)->post('/disposisi', [
+        'surat_masuk_id' => $surat->id,
+        'kepada_user_id' => [$direktur->id],
+        'instruksi'      => 'Mohon ditindaklanjuti',
+    ]);
+
+    $disposisi = Disposisi::where('surat_masuk_id', $surat->id)->first();
+
+    $this->actingAs($direktur)->put('/disposisi/' . $disposisi->id, ['status' => 'menunggu_verifikasi']);
+    $this->actingAs($dirut)->put('/disposisi/' . $disposisi->id . '/verifikasi');
+
+    // Sekali diverifikasi, disposisinya tertutup. Penerima tidak dapat
+    // membukanya lagi sepihak, dan pemberi pun tidak lagi punya keputusan
+    // yang tertunda atasnya.
+    $this->actingAs($direktur)
+        ->put('/disposisi/' . $disposisi->id, ['status' => 'diproses'])
+        ->assertForbidden();
+
+    $this->actingAs($dirut)
+        ->put('/disposisi/' . $disposisi->id . '/kembalikan', ['catatan_verifikasi' => 'Ternyata kurang'])
+        ->assertForbidden();
+
+    expect($surat->fresh()->status)->toBe('selesai');
 });
 
 test('surat kembali baru bila disposisi terakhirnya dihapus', function () {

@@ -33,9 +33,11 @@ test('file tindak lanjut dapat diganti tanpa error', function () {
         'file_tindak_lanjut' => 'disposisi_laporan/lama.pdf',
     ]);
 
+    // Penerima tidak lagi menutup sendiri disposisinya. Yang ia lakukan adalah
+    // menyatakan pekerjaannya rampung, lalu pemberi disposisi memverifikasi.
     $this->actingAs($penerima)
         ->put('/disposisi/' . $disposisi->id, [
-            'status'                => 'selesai',
+            'status'                => 'menunggu_verifikasi',
             'catatan_tindak_lanjut' => 'Sudah dikerjakan',
             'file_tindak_lanjut'    => UploadedFile::fake()->create('baru.pdf', 100, 'application/pdf'),
         ])
@@ -43,7 +45,7 @@ test('file tindak lanjut dapat diganti tanpa error', function () {
 
     $disposisi->refresh();
 
-    expect($disposisi->status)->toBe('selesai')
+    expect($disposisi->status)->toBe('menunggu_verifikasi')
         ->and($disposisi->file_tindak_lanjut)->not->toBe('disposisi_laporan/lama.pdf');
 
     Storage::disk('public')->assertMissing('disposisi_laporan/lama.pdf');

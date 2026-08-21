@@ -53,14 +53,69 @@
                     </h2>
                     
                     <!-- Status Badge Utama -->
-                    @if($disposisi->status == 'menunggu')
-                        <span class="inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold bg-yellow-50 text-yellow-700 border border-yellow-200">Menunggu</span>
-                    @elseif($disposisi->status == 'diproses')
-                        <span class="inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold bg-blue-50 text-blue-700 border border-blue-200">Diproses</span>
-                    @else
-                        <span class="inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200">Selesai</span>
-                    @endif
+                    <span class="inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold border {{ $disposisi->warna_status }}">
+                        {{ $disposisi->label_status }}
+                    </span>
                 </div>
+
+                {{-- Penutupan disposisi ada di tangan pemberinya. Kartu ini
+                     hanya muncul bagi pihak yang memberi perintah, dan hanya
+                     ketika penerimanya sudah menyatakan pekerjaannya rampung. --}}
+                @if($disposisi->bolehDiverifikasiOleh(auth()->user()))
+                    <div class="mb-6 rounded-xl border border-violet-200 bg-violet-50 p-5">
+                        <p class="text-sm font-bold text-violet-900">
+                            {{ $disposisi->label_penerima }} menyatakan pekerjaannya rampung
+                        </p>
+                        <p class="mt-1.5 text-sm text-violet-800 leading-relaxed">
+                            Periksa catatan dan lampiran hasil kerjanya di bawah. Bila sudah sesuai,
+                            setujui untuk menutup disposisi ini. Bila belum, kembalikan beserta
+                            catatan perbaikannya.
+                        </p>
+
+                        <div class="mt-4 flex flex-wrap items-center gap-2">
+                            <form action="{{ route('disposisi.verifikasi', $disposisi->id) }}"
+                                  method="POST"
+                                  onsubmit="event.preventDefault(); ConfirmModal.show({title:'Setujui Tindak Lanjut',message:'Disposisi ini akan dinyatakan selesai dan tidak dapat diubah lagi. Lanjutkan?',variant:'success',confirmText:'Ya, Setujui'}).then(ok=>{if(ok)this.submit()})"
+                                  class="inline">
+                                @csrf
+                                @method('PUT')
+                                <button type="submit"
+                                        class="px-5 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-semibold rounded-xl shadow transition-colors">
+                                    Setujui &amp; Tutup Disposisi
+                                </button>
+                            </form>
+
+                            <button type="button"
+                                    onclick="document.getElementById('form-kembalikan').classList.toggle('hidden')"
+                                    class="px-5 py-2.5 bg-white hover:bg-slate-50 text-slate-700 border border-slate-300 text-sm font-semibold rounded-xl transition-colors">
+                                Kembalikan untuk Diperbaiki
+                            </button>
+                        </div>
+
+                        <form id="form-kembalikan"
+                              action="{{ route('disposisi.kembalikan', $disposisi->id) }}"
+                              method="POST"
+                              class="hidden mt-4">
+                            @csrf
+                            @method('PUT')
+                            <label class="block text-xs font-bold text-violet-900 mb-1.5">
+                                Catatan perbaikan
+                            </label>
+                            <textarea name="catatan_verifikasi"
+                                      rows="3"
+                                      required
+                                      class="w-full px-4 py-3 bg-white border border-violet-200 rounded-xl text-sm text-slate-800 outline-none focus:ring-2 focus:ring-violet-400 resize-none"
+                                      placeholder="Sebutkan apa yang perlu diperbaiki. Catatan ini dibaca {{ $disposisi->label_penerima }}.">{{ old('catatan_verifikasi') }}</textarea>
+                            @error('catatan_verifikasi')
+                                <p class="text-red-600 text-xs mt-1.5">{{ $message }}</p>
+                            @enderror
+                            <button type="submit"
+                                    class="mt-3 px-5 py-2.5 bg-amber-600 hover:bg-amber-700 text-white text-sm font-semibold rounded-xl shadow transition-colors">
+                                Kirim Pengembalian
+                            </button>
+                        </form>
+                    </div>
+                @endif
 
                 <div class="space-y-4 text-sm">
                     <div>
@@ -132,14 +187,11 @@
                             @php
                                 $statusColor = match($item->status) {
                                     'selesai' => 'bg-emerald-500 text-white',
+                                    'menunggu_verifikasi' => 'bg-violet-500 text-white',
                                     'diproses' => 'bg-blue-500 text-white',
                                     default => 'bg-yellow-500 text-slate-900',
                                 };
-                                $statusLabel = match($item->status) {
-                                    'selesai' => 'Selesai',
-                                    'diproses' => 'Diproses',
-                                    default => 'Menunggu',
-                                };
+                                $statusLabel = $item->label_status;
                                 
                                 $isStepOverdue = $item->status !== 'selesai' && $item->batas_waktu && \Carbon\Carbon::parse($item->batas_waktu)->isPast() && !\Carbon\Carbon::parse($item->batas_waktu)->isToday();
                                 $isStepDueToday = $item->status !== 'selesai' && $item->batas_waktu && \Carbon\Carbon::parse($item->batas_waktu)->isToday();
@@ -154,7 +206,7 @@
                                 <div class="bg-white border border-slate-200 rounded-2xl p-5 hover:border-slate-300 transition-all hover:shadow-md relative overflow-hidden">
                                     
                                     <!-- Status strip -->
-                                    <div class="absolute left-0 top-0 bottom-0 w-1.5 @if($item->status == 'selesai') bg-emerald-500 @elseif($item->status == 'diproses') bg-blue-500 @else bg-yellow-500 @endif"></div>
+                                    <div class="absolute left-0 top-0 bottom-0 w-1.5 {{ str_replace(' text-white', '', str_replace(' text-slate-900', '', $statusColor)) }}"></div>
 
                                     <!-- Step Header -->
                                     <div class="flex flex-col sm:flex-row sm:justify-between sm:items-start gap-3 mb-4 pl-2">

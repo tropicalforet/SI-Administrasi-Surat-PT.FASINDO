@@ -7,6 +7,7 @@ use App\Models\User;
 use App\Helpers\ActivityHelper;
 use App\Notifications\SkpdMenungguTindakan;
 use App\Notifications\SkpdDiputuskan;
+use App\Notifications\PenugasanDinasDiterima;
 use App\Helpers\NomorDokumenHelper;
 use Illuminate\Http\Request;
 use Carbon\Carbon;
@@ -369,7 +370,18 @@ class SkpdController extends Controller
         ]);
 
         if ($skpd->user) {
-            $skpd->user->notify(new SkpdDiputuskan($skpd, 'disetujui', auth()->user()->name));
+            /*
+             * Inilah saat pegawai pertama kali mengetahui perintahnya, karena
+             * penugasan yang belum ditandatangani memang belum tampil di
+             * layarnya. Bunyinya pun berbeda: pada penugasan ia diberi tahu
+             * bahwa ia ditugaskan, bukan bahwa pengajuannya disetujui -
+             * sesuatu yang tidak pernah ia ajukan.
+             */
+            $skpd->user->notify(
+                $skpd->merupakanPenugasan()
+                    ? new PenugasanDinasDiterima($skpd)
+                    : new SkpdDiputuskan($skpd, 'disetujui', auth()->user()->name)
+            );
         }
 
         ActivityHelper::log('Approve SKPD', 'Menyetujui SKPD dan menerbitkan nomor ' . $nomor);
@@ -404,8 +416,16 @@ class SkpdController extends Controller
             'catatan_revisi' => $request->catatan_revisi
         ]);
 
-        if ($skpd->user) {
-            $skpd->user->notify(new SkpdDiputuskan($skpd, 'ditolak', $user->name));
+        /*
+         * Yang dikabari adalah pihak yang harus memperbaikinya, yaitu
+         * penyusunnya. Pada penugasan, mengabari pegawai yang ditugaskan
+         * justru menyesatkan: dokumennya belum sah sehingga belum terbuka
+         * baginya, dan pemberitahuannya berujung pada halaman yang menolak.
+         */
+        $penyusun = $skpd->merupakanPenugasan() ? $skpd->ditugaskanOleh : $skpd->user;
+
+        if ($penyusun) {
+            $penyusun->notify(new SkpdDiputuskan($skpd, 'ditolak', $user->name));
         }
 
         ActivityHelper::log('Reject SKPD', 'Menolak SKPD ' . $skpd->label_nomor . ' dengan alasan: ' . $request->catatan_revisi);

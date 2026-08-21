@@ -77,7 +77,7 @@ test('induk tidak dapat ditandai selesai selama anaknya belum selesai', function
     ]);
 
     $this->actingAs($direktur)->put('/disposisi/' . $induk->id, [
-        'status'                => 'selesai',
+        'status'                => 'menunggu_verifikasi',
         'catatan_tindak_lanjut' => 'Sudah saya cek',
     ]);
 
@@ -103,12 +103,17 @@ test('penerima induk diberi tahu saat seluruh anak selesai', function () {
         'tanggal_disposisi'   => now(),
     ]));
 
-    // Anak pertama selesai: induk belum siap dikonfirmasi
-    $this->actingAs($staffA)->put('/disposisi/' . $anak[0]->id, ['status' => 'selesai']);
-    Notification::assertNothingSentTo($direktur);
+    // Anak baru benar-benar selesai setelah pemberinya memverifikasi, sehingga
+    // tiap anak melewati dua langkah: dinyatakan rampung, lalu diverifikasi.
+    $this->actingAs($staffA)->put('/disposisi/' . $anak[0]->id, ['status' => 'menunggu_verifikasi']);
+    $this->actingAs($direktur)->put('/disposisi/' . $anak[0]->id . '/verifikasi');
 
-    // Anak terakhir selesai: penerima induk diberi tahu
-    $this->actingAs($staffB)->put('/disposisi/' . $anak[1]->id, ['status' => 'selesai']);
+    // Satu anak selesai, satu belum: induk belum siap dikonfirmasi.
+    Notification::assertNotSentTo($direktur, DisposisiSiapDikonfirmasi::class);
+
+    $this->actingAs($staffB)->put('/disposisi/' . $anak[1]->id, ['status' => 'menunggu_verifikasi']);
+    $this->actingAs($direktur)->put('/disposisi/' . $anak[1]->id . '/verifikasi');
+
     Notification::assertSentTo($direktur, DisposisiSiapDikonfirmasi::class);
 });
 
@@ -130,11 +135,11 @@ test('pemberitahuan siap konfirmasi hanya dikirim sekali', function () {
         'tanggal_disposisi'   => now(),
     ]);
 
-    $this->actingAs($staff)->put('/disposisi/' . $anak->id, ['status' => 'selesai']);
-    $this->actingAs($staff)->put('/disposisi/' . $anak->id, [
-        'status'                => 'selesai',
-        'catatan_tindak_lanjut' => 'Diperbarui lagi',
-    ]);
+    // Penyelarasan induk dijalankan dua kali: sekali saat anak dinyatakan
+    // rampung, sekali lagi saat anak itu diverifikasi. Pemberitahuannya tetap
+    // harus satu, dijaga oleh penanda siap_konfirmasi_pada.
+    $this->actingAs($staff)->put('/disposisi/' . $anak->id, ['status' => 'menunggu_verifikasi']);
+    $this->actingAs($direktur)->put('/disposisi/' . $anak->id . '/verifikasi');
 
     Notification::assertSentToTimes($direktur, DisposisiSiapDikonfirmasi::class, 1);
 });
@@ -155,23 +160,31 @@ test('induk dapat ditandai selesai setelah seluruh anaknya selesai', function ()
         'tanggal_disposisi'   => now(),
     ]);
 
+    // Penerima induk menyatakan rampung, lalu pemberi induk yang menutupnya.
     $this->actingAs($direktur)->put('/disposisi/' . $induk->id, [
-        'status'                => 'selesai',
+        'status'                => 'menunggu_verifikasi',
         'catatan_tindak_lanjut' => 'Hasil sudah diperiksa',
     ])->assertRedirect(route('disposisi.saya'));
+
+    $this->actingAs($induk->dariUser)->put('/disposisi/' . $induk->id . '/verifikasi');
 
     expect($induk->fresh()->status)->toBe('selesai');
 });
 
-test('disposisi tanpa anak tetap bisa diselesaikan langsung', function () {
+test('disposisi tanpa anak tetap melewati verifikasi pemberinya', function () {
     $staff = penerimaBerizin('staff');
 
     $disposisi = indukUntuk($staff, 'diproses');
 
     $this->actingAs($staff)->put('/disposisi/' . $disposisi->id, [
-        'status'                => 'selesai',
+        'status'                => 'menunggu_verifikasi',
         'catatan_tindak_lanjut' => 'Selesai dikerjakan',
     ])->assertRedirect(route('disposisi.saya'));
+
+    // Tanpa disposisi lanjutan pun penutupannya tetap keputusan pemberi.
+    expect($disposisi->fresh()->status)->toBe('menunggu_verifikasi');
+
+    $this->actingAs($disposisi->dariUser)->put('/disposisi/' . $disposisi->id . '/verifikasi');
 
     expect($disposisi->fresh()->status)->toBe('selesai');
 });

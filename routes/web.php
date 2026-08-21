@@ -251,6 +251,17 @@ Route::middleware('permission:akses_disposisi')->group(function () {
         '/disposisi/{disposisi}',
         [DisposisiController::class, 'update']
     )->name('disposisi.update');
+
+    // Penutupan disposisi ada di tangan pemberinya, bukan penerimanya.
+    Route::put(
+        '/disposisi/{disposisi}/verifikasi',
+        [DisposisiController::class, 'verifikasi']
+    )->name('disposisi.verifikasi');
+
+    Route::put(
+        '/disposisi/{disposisi}/kembalikan',
+        [DisposisiController::class, 'kembalikan']
+    )->name('disposisi.kembalikan');
 });
 
 /*

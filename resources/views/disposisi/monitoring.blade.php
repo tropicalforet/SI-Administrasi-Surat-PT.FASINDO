@@ -37,19 +37,9 @@
                     </h2>
                     
                     <div>
-                        @if($item->status == 'menunggu')
-                            <span class="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold bg-yellow-50 text-yellow-700 border border-yellow-200 whitespace-nowrap">
-                                Menunggu
-                            </span>
-                        @elseif($item->status == 'diproses')
-                            <span class="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold bg-blue-50 text-blue-700 border border-blue-200 whitespace-nowrap">
-                                Diproses
-                            </span>
-                        @else
-                            <span class="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200 whitespace-nowrap">
-                                Selesai
-                            </span>
-                        @endif
+                        <span class="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold border whitespace-nowrap {{ $item->warna_status }}">
+                            {{ $item->label_status }}
+                        </span>
                     </div>
                 </div>
 
@@ -103,6 +93,7 @@
                                 @php
                                     $stripColor = match(strtolower($child->status)) {
                                         'selesai' => 'bg-emerald-400',
+                                        'menunggu_verifikasi' => 'bg-violet-400',
                                         'diproses' => 'bg-blue-400',
                                         default => 'bg-yellow-400',
                                     };
@@ -114,13 +105,17 @@
                                         {{ $child->label_penerima }}
                                     </div>
                                     <div>
-                                        @if(strtolower($child->status) == 'menunggu')
-                                            <span class="text-[10px] font-bold uppercase tracking-wider text-yellow-600 bg-yellow-100 px-2 py-0.5 rounded-full">Menunggu</span>
-                                        @elseif(strtolower($child->status) == 'diproses')
-                                            <span class="text-[10px] font-bold uppercase tracking-wider text-blue-600 bg-blue-100 px-2 py-0.5 rounded-full">Diproses</span>
-                                        @else
-                                            <span class="text-[10px] font-bold uppercase tracking-wider text-emerald-600 bg-emerald-100 px-2 py-0.5 rounded-full">Selesai</span>
-                                        @endif
+                                        @php
+                                            $warnaAnak = match(strtolower($child->status)) {
+                                                'selesai' => 'text-emerald-600 bg-emerald-100',
+                                                'menunggu_verifikasi' => 'text-violet-600 bg-violet-100',
+                                                'diproses' => 'text-blue-600 bg-blue-100',
+                                                default => 'text-yellow-600 bg-yellow-100',
+                                            };
+                                        @endphp
+                                        <span class="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full {{ $warnaAnak }}">
+                                            {{ $child->label_status }}
+                                        </span>
                                     </div>
                                 </div>
 
