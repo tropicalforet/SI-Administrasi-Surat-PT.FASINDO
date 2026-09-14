@@ -138,11 +138,26 @@ class SuratMasuk extends Model
      */
     public function penerimaUsers()
     {
-        if ($this->penerima_role) {
+        if ($this->tujuanJabatanSah()) {
             return User::where('role', $this->penerima_role)->get();
         }
 
         return $this->penerimaUser ? collect([$this->penerimaUser]) : collect();
+    }
+
+    /**
+     * Tujuan berbasis jabatan hanya sah untuk jabatan tunggal.
+     *
+     * Surat lama sempat ditujukan ke "manager", padahal ada tiga manager di
+     * unit berbeda - akibatnya surat unit Keuangan ikut terbaca manager unit
+     * Teknik. Nilai lama itu dibiarkan tersimpan sebagai catatan tujuan asli,
+     * tetapi tidak lagi memberi hak baca kepada siapa pun. Surat semacam itu
+     * tetap dapat dibaca sekretaris, pimpinan, dan penerima disposisinya.
+     */
+    public function tujuanJabatanSah(): bool
+    {
+        return $this->penerima_role
+            && array_key_exists($this->penerima_role, User::ROLE_PENERIMA_SURAT);
     }
 
     public function getLabelPenerimaAttribute(): string
@@ -151,9 +166,19 @@ class SuratMasuk extends Model
             return User::ROLE_PENERIMA_SURAT[$this->penerima_role] ?? ucfirst($this->penerima_role);
         }
 
-        return $this->penerimaUser
-            ? $this->penerimaUser->name . ' (' . ucfirst($this->penerimaUser->role) . ')'
-            : ($this->penerima ?? '-');
+        if (!$this->penerimaUser) {
+            return $this->penerima ?? '-';
+        }
+
+        // Jabatan penuh, bukan kode role - "Staff" tidak menjelaskan apa pun
+        // sementara "Pelaksana / Admin (Teknik)" langsung terbaca.
+        $keterangan = $this->penerimaUser->label_jabatan;
+
+        if ($this->penerimaUser->unit) {
+            $keterangan .= ' - ' . $this->penerimaUser->label_unit;
+        }
+
+        return $this->penerimaUser->name . ' (' . $keterangan . ')';
     }
 
     /**
@@ -175,21 +200,47 @@ class SuratMasuk extends Model
             return true;
         }
 
-        if ($this->penerima_role && $this->penerima_role === strtolower($user->role)) {
+        if ($this->tujuanJabatanSah() && $this->penerima_role === strtolower($user->role)) {
             return true;
         }
 
         return $this->disposisis()->where('kepada_user_id', $user->id)->exists();
     }
 
+    /**
+     * Jangkauan Laporan Surat Masuk.
+     *
+     * Laporan ini adalah buku agenda: isinya keterangan surat (tanggal, nomor,
+     * pengirim, sifat, perihal, status), bukan isi maupun berkasnya. Jajaran
+     * direksi - Dirut, Sekretaris, dan para Direktur bidang - membacanya
+     * seluruhnya sebagai gambaran lalu lintas surat perusahaan.
+     *
+     * Selain mereka, yang tampil tetap hanya surat yang memang boleh dibaca
+     * yang bersangkutan.
+     */
+    public function scopeLaporanUntuk($query, User $user)
+    {
+        $direksi = in_array(strtolower($user->role), ['admin', 'administrator', 'superadmin', 'dirut', 'sekretaris'])
+            || $user->isDirektur();
+
+        return $direksi ? $query : $query->dapatDibacaOleh($user);
+    }
+
     public function scopeDapatDibacaOleh($query, User $user)
     {
-        return $query->where(function ($q) use ($user) {
-            $q->where('penerima_id', $user->id)
-              ->orWhere('penerima_role', strtolower($user->role))
-              ->orWhereHas('disposisis', function ($sq) use ($user) {
-                  $sq->where('kepada_user_id', $user->id);
-              });
+        $role = strtolower($user->role);
+
+        return $query->where(function ($q) use ($user, $role) {
+            $q->where('penerima_id', $user->id);
+
+            // Hanya jabatan tunggal yang memberi hak baca lewat role.
+            if (array_key_exists($role, User::ROLE_PENERIMA_SURAT)) {
+                $q->orWhere('penerima_role', $role);
+            }
+
+            $q->orWhereHas('disposisis', function ($sq) use ($user) {
+                $sq->where('kepada_user_id', $user->id);
+            });
         });
     }
 }

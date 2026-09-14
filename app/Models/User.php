@@ -60,7 +60,14 @@ class User extends Authenticatable
     public const ROLE_WAJIB_UNIT = ['direktur1', 'direktur2', 'manager', 'staff'];
 
     /**
-     * Role yang dapat dijadikan tujuan surat masuk, beserta labelnya.
+     * Jabatan yang dapat dijadikan tujuan surat masuk, beserta labelnya.
+     *
+     * Hanya jabatan tunggal yang boleh di sini - satu jabatan, satu orang.
+     * "Manager" dan "Pelaksana" sengaja tidak ada: perusahaan punya beberapa
+     * manager dan beberapa pelaksana di unit berbeda, sehingga surat yang
+     * ditujukan begitu akan terbaca oleh orang di unit yang tidak
+     * berkepentingan. Untuk mereka, sekretaris menyebut nama orangnya.
+     *
      * Role administrator tidak termasuk karena bukan pelaksana persuratan.
      */
     public const ROLE_PENERIMA_SURAT = [
@@ -68,8 +75,6 @@ class User extends Authenticatable
         'direktur1'  => 'Direktur Keuangan dan Administrasi',
         'direktur2'  => 'Direktur Teknik',
         'sekretaris' => 'Sekretaris',
-        'manager'    => 'Manager',
-        'staff'      => 'Pelaksana / Admin',
     ];
 
     protected $fillable = [
@@ -92,6 +97,32 @@ class User extends Authenticatable
             'email_verified_at' => 'datetime',
             'password' => 'hashed',
         ];
+    }
+
+    /**
+     * Lepaskan dokumen dari pemiliknya sebelum pengguna benar-benar dihapus.
+     *
+     * Dokumen perusahaan tidak ikut lenyap bersama orangnya: SKPD yang sudah
+     * disetujui adalah dasar pertanggungjawaban, dan jejak aktivitas adalah
+     * bukti audit. Keduanya harus tetap ada meski pegawainya sudah keluar.
+     *
+     * Kunci asing di database juga sudah diubah menjadi SET NULL, tetapi
+     * penjagaan di sini yang berlaku di semua driver - termasuk SQLite yang
+     * dipakai saat pengujian.
+     */
+    protected static function booted(): void
+    {
+        static::deleting(function (User $user) {
+            Skpd::where('user_id', $user->id)->update(['user_id' => null]);
+            ActivityLog::where('user_id', $user->id)->update(['user_id' => null]);
+
+            // Surat Tugas sudah dipensiunkan, tetapi arsip lamanya masih
+            // ditunjuk sejumlah SKPD sehingga ikut dijaga.
+            SuratTugas::where('user_id', $user->id)->update(['user_id' => null]);
+
+            Disposisi::where('dari_user_id', $user->id)->update(['dari_user_id' => null]);
+            Disposisi::where('kepada_user_id', $user->id)->update(['kepada_user_id' => null]);
+        });
     }
 
     // ==========================

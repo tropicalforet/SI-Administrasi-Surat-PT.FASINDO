@@ -1,4 +1,4 @@
-@extends('layouts.app')
+﻿@extends('layouts.app')
 
 @section('content')
 <div class="p-4 sm:p-6 lg:p-8 font-ui">
@@ -121,7 +121,7 @@
                                 </div>
                             </td>
                             <td class="py-4 px-6 font-semibold text-slate-700 whitespace-nowrap">
-                                {{ $log->user->name }}
+                                {{ $log->label_pelaku }}
                             </td>
                             <td class="py-4 px-6 whitespace-nowrap">
                                 @php

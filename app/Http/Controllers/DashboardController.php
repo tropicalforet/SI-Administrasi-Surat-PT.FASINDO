@@ -61,25 +61,29 @@ class DashboardController extends Controller
             ->take(5)
             ->get();
 
-        // 4. SKPD Stats & Terbaru (Role-based)
-        // Dirut dan sekretaris melihat seluruh pengajuan, pegawai lain hanya
-        // melihat miliknya sendiri.
-        $skpdStatsQuery = \App\Models\Skpd::query();
-        $skpdTerbaruQuery = \App\Models\Skpd::query();
-
-        if ($role !== 'dirut' && $role !== 'sekretaris') {
-            $skpdStatsQuery->where('user_id', auth()->id());
-            $skpdTerbaruQuery->where('user_id', auth()->id());
-        }
-
-        $skpdStats = $skpdStatsQuery->selectRaw("
+        /*
+         * 4. Rekap dan daftar SKPD
+         *
+         * Jangkauannya memakai aturan yang sama dengan daftar SKPD - lihat
+         * Skpd::scopeTerlihatOleh - sehingga angka di dashboard tidak pernah
+         * memuat dokumen yang tidak boleh dibuka orangnya, termasuk draf yang
+         * masih disusun orang lain.
+         *
+         * Sebelumnya dashboard menarik seluruh baris tanpa saringan bagi Dirut
+         * dan Sekretaris, lalu menyaring per pengguna dengan aturannya sendiri.
+         */
+        $skpdStats = \App\Models\Skpd::terlihatOleh(auth()->user())->selectRaw("
             COUNT(*) as total,
-            SUM(CASE WHEN status = 'pengajuan' OR status = 'diperiksa' THEN 1 ELSE 0 END) as pending,
+            SUM(CASE WHEN status IN ('menunggu_direktur', 'menunggu_dirut') THEN 1 ELSE 0 END) as pending,
             SUM(CASE WHEN status = 'disetujui' THEN 1 ELSE 0 END) as disetujui,
             SUM(CASE WHEN status = 'ditolak' THEN 1 ELSE 0 END) as ditolak
         ")->first();
 
-        $skpdTerbaru = $skpdTerbaruQuery->latest()->take(5)->get();
+        $skpdTerbaru = \App\Models\Skpd::with('user')
+            ->terlihatOleh(auth()->user())
+            ->latest()
+            ->take(5)
+            ->get();
 
         // 5. Data Chart Bulanan (Surat Masuk & Surat Keluar)
         $smBulananData = $this->hitungPerBulan(
@@ -92,12 +96,12 @@ class DashboardController extends Controller
             'tanggal_surat'
         );
 
-        // 6. Data Chart Bulanan (SKPD)
-        $skpdBulananQuery = \App\Models\Skpd::whereYear('tanggal_berangkat', $currentYear);
-        if ($role !== 'dirut' && $role !== 'sekretaris') {
-            $skpdBulananQuery->where('user_id', auth()->id());
-        }
-        $skpdBulananData = $this->hitungPerBulan($skpdBulananQuery, 'tanggal_berangkat');
+        // 6. Data Chart Bulanan (SKPD) - jangkauannya sama dengan rekap di atas
+        $skpdBulananData = $this->hitungPerBulan(
+            \App\Models\Skpd::terlihatOleh(auth()->user())
+                ->whereYear('tanggal_berangkat', $currentYear),
+            'tanggal_berangkat'
+        );
 
         $suratMasukBulanan = [];
         $suratKeluarBulanan = [];

@@ -7,14 +7,32 @@ use App\Models\SuratMasuk;
 use App\Helpers\ActivityHelper;
 use App\Notifications\DisposisiDiterima;
 use App\Notifications\DisposisiSiapDikonfirmasi;
+use App\Notifications\DisposisiMenungguVerifikasi;
+use App\Notifications\DisposisiHasilVerifikasi;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB; // <-- Tambahan wajib untuk Transaction
 use Illuminate\Support\Facades\Storage; // <-- Dipakai saat mengganti file tindak lanjut
 
 class DisposisiController extends Controller
 {
+    /**
+     * Mendisposisikan surat mensyaratkan hak membacanya lebih dulu.
+     *
+     * Tanpa penjagaan ini, siapa pun yang punya izin disposisi dapat membuka
+     * surat yang bukan urusannya hanya dengan menebak nomor id - halaman
+     * formnya sendiri sudah menampilkan pengirim dan perihal surat.
+     */
+    private function pastikanBolehMendisposisikan(SuratMasuk $suratMasuk): void
+    {
+        if (!$suratMasuk->bolehDibacaOleh(auth()->user())) {
+            abort(403, 'Akses ditolak. Surat ini bukan kewenangan Anda.');
+        }
+    }
+
     public function create(SuratMasuk $suratMasuk)
     {
+        $this->pastikanBolehMendisposisikan($suratMasuk);
+
         $users = $this->tujuanDisposisi(auth()->user());
 
         if ($users->isEmpty() && !in_array(strtolower(auth()->user()->role), ['dirut', 'sekretaris'])) {
@@ -85,6 +103,12 @@ class DisposisiController extends Controller
             'batas_waktu'    => 'nullable|date|after_or_equal:today',
         ]);
 
+        // Form boleh saja tidak pernah ditampilkan, tetapi POST langsung tetap
+        // harus ditolak - di sinilah disposisi benar-benar tercipta.
+        $this->pastikanBolehMendisposisikan(
+            SuratMasuk::findOrFail($request->surat_masuk_id)
+        );
+
         // Gunakan DB Transaction agar penyimpanan disposisi dan log berjalan bersamaan (aman)
         DB::transaction(function () use ($request) {
             foreach ($request->kepada_user_id as $userId) {
@@ -147,19 +171,20 @@ class DisposisiController extends Controller
 
     public function update(Request $request, Disposisi $disposisi)
     {
-        if ($disposisi->kepada_user_id != auth()->id()) {
-            abort(403);
-        }
+        // Penerima tidak lagi dapat menutup sendiri disposisinya. Yang ia
+        // lakukan adalah menyatakan pekerjaannya rampung; penutupannya
+        // menjadi keputusan pihak yang memberi perintah.
+        abort_unless($disposisi->bolehDitindaklanjutiOleh(auth()->user()), 403);
 
         $request->validate([
-            'status'                => 'required|in:menunggu,diproses,selesai',
+            'status'                => 'required|in:' . implode(',', Disposisi::STATUS_PENERIMA),
             'catatan_tindak_lanjut' => 'nullable|string',
             'file_tindak_lanjut'    => 'nullable|mimes:pdf,jpg,jpeg,png,doc,docx,zip,xls,xlsx|max:5120',
         ]);
 
-        // Disposisi tidak boleh ditutup selama disposisi lanjutannya belum
-        // selesai, agar status yang dibaca atasan mencerminkan kenyataan.
-        if ($request->status === 'selesai' && $disposisi->punyaAnakBelumSelesai()) {
+        // Pekerjaan tidak boleh dinyatakan rampung selama disposisi lanjutannya
+        // belum selesai, agar status yang dibaca atasan mencerminkan kenyataan.
+        if ($request->status === 'menunggu_verifikasi' && $disposisi->punyaAnakBelumSelesai()) {
             return back()->with('error', 'Disposisi belum dapat diselesaikan karena masih ada disposisi lanjutan yang berjalan.');
         }
 
@@ -178,12 +203,20 @@ class DisposisiController extends Controller
                 'status'                => $request->status,
                 'catatan_tindak_lanjut' => $request->catatan_tindak_lanjut,
                 'file_tindak_lanjut'    => $filePath,
+                // Catatan pengembalian yang lama dibersihkan begitu pekerjaannya
+                // diperbaiki, supaya tidak terbaca seolah masih berlaku.
+                'catatan_verifikasi'    => null,
             ]);
 
             ActivityHelper::log(
                 'Update Disposisi',
-                auth()->user()->name . ' mengubah status disposisi surat ' . ($disposisi->suratMasuk?->nomor_surat ?? '-') . ' menjadi ' . ucfirst($request->status)
+                auth()->user()->name . ' mengubah status disposisi surat '
+                    . ($disposisi->suratMasuk?->nomor_surat ?? '-') . ' menjadi ' . $disposisi->label_status
             );
+
+            if ($disposisi->menungguVerifikasi() && $disposisi->dariUser) {
+                $disposisi->dariUser->notify(new DisposisiMenungguVerifikasi($disposisi));
+            }
 
             $this->sinkronkanInduk($disposisi);
 
@@ -192,7 +225,83 @@ class DisposisiController extends Controller
 
         return redirect()
             ->route('disposisi.saya')
-            ->with('success', 'Tindak lanjut berhasil disimpan.');
+            ->with('success', $disposisi->menungguVerifikasi()
+                ? 'Tindak lanjut dikirim kepada ' . $disposisi->label_pengirim . ' untuk diverifikasi.'
+                : 'Tindak lanjut berhasil disimpan.');
+    }
+
+    /**
+     * Pemberi disposisi menyatakan hasil kerja penerimanya sudah sesuai.
+     * Di sinilah disposisi benar-benar ditutup.
+     */
+    public function verifikasi(Disposisi $disposisi)
+    {
+        abort_unless($disposisi->bolehDiverifikasiOleh(auth()->user()), 403);
+
+        if ($disposisi->punyaAnakBelumSelesai()) {
+            return back()->with('error', 'Masih ada disposisi lanjutan yang berjalan, sehingga belum dapat ditutup.');
+        }
+
+        DB::transaction(function () use ($disposisi) {
+            $disposisi->update(['status' => 'selesai']);
+            $disposisi->forceFill(['diverifikasi_pada' => now()])->save();
+
+            ActivityHelper::log(
+                'Verifikasi Disposisi',
+                auth()->user()->name . ' memverifikasi tindak lanjut '
+                    . $disposisi->label_penerima . ' dan menutup disposisi'
+            );
+
+            if ($disposisi->kepadaUser) {
+                $disposisi->kepadaUser->notify(
+                    new DisposisiHasilVerifikasi($disposisi, 'diterima', auth()->user()->name)
+                );
+            }
+
+            $this->sinkronkanInduk($disposisi);
+
+            $disposisi->suratMasuk?->segarkanStatus();
+        });
+
+        return back()->with('success', 'Tindak lanjut diverifikasi. Disposisi dinyatakan selesai.');
+    }
+
+    /**
+     * Pemberi disposisi menilai hasilnya belum sesuai, sehingga pekerjaannya
+     * dikembalikan beserta catatan apa yang perlu diperbaiki.
+     */
+    public function kembalikan(Request $request, Disposisi $disposisi)
+    {
+        abort_unless($disposisi->bolehDiverifikasiOleh(auth()->user()), 403);
+
+        $request->validate([
+            'catatan_verifikasi' => 'required|string',
+        ], [
+            'catatan_verifikasi.required' => 'Sebutkan apa yang perlu diperbaiki.',
+        ]);
+
+        DB::transaction(function () use ($request, $disposisi) {
+            $disposisi->update([
+                'status'             => 'diproses',
+                'catatan_verifikasi' => $request->catatan_verifikasi,
+            ]);
+
+            ActivityHelper::log(
+                'Kembalikan Disposisi',
+                auth()->user()->name . ' mengembalikan tindak lanjut '
+                    . $disposisi->label_penerima . ' dengan catatan: ' . $request->catatan_verifikasi
+            );
+
+            if ($disposisi->kepadaUser) {
+                $disposisi->kepadaUser->notify(
+                    new DisposisiHasilVerifikasi($disposisi, 'dikembalikan', auth()->user()->name)
+                );
+            }
+
+            $disposisi->suratMasuk?->segarkanStatus();
+        });
+
+        return back()->with('success', 'Tindak lanjut dikembalikan kepada ' . $disposisi->label_penerima . '.');
     }
 
     /**
@@ -227,11 +336,23 @@ class DisposisiController extends Controller
         }
     }
 
-    public function monitoring()
+    /**
+     * Monitoring memakai daftar yang sama dengan Laporan Disposisi.
+     *
+     * Sebelumnya administrator diloloskan middleware tetapi ditolak di sini,
+     * sehingga menunya terlihat lalu berujung 403 saat diklik. Perbandingannya
+     * juga tidak menormalkan huruf besar-kecil seperti bagian lain sistem.
+     */
+    private function pastikanBolehMemantau(): void
     {
-        if (auth()->user()->role != 'dirut' && auth()->user()->role != 'sekretaris') {
+        if (!Disposisi::bolehLihatLaporan(auth()->user())) {
             abort(403, 'Akses khusus Direktur Utama dan Sekretaris.');
         }
+    }
+
+    public function monitoring()
+    {
+        $this->pastikanBolehMemantau();
 
         $data = Disposisi::with([
                 'suratMasuk',
@@ -249,9 +370,7 @@ class DisposisiController extends Controller
 
     public function showMonitoring(Disposisi $disposisi)
     {
-        if (auth()->user()->role != 'dirut' && auth()->user()->role != 'sekretaris') {
-            abort(403);
-        }
+        $this->pastikanBolehMemantau();
 
         $disposisi->load([
             'suratMasuk',

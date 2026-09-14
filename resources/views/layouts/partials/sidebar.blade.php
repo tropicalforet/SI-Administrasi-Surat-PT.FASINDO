@@ -6,20 +6,39 @@
     if (auth()->check()) {
         $notifikasiBelumDibaca = auth()->user()->unreadNotifications()->count();
         $userRole = strtolower(auth()->user()->role);
-        if ($userRole === 'sekretaris') {
-            // SKPD baru selalu tersimpan dengan status 'diperiksa'; status
-            // 'pengajuan' hanya default kolom lama yang tidak pernah dipakai.
-            $skpdPendingCount = \App\Models\Skpd::where('status', 'diperiksa')->count();
-        } elseif ($userRole === 'dirut') {
-            $skpdPendingCount = \App\Models\Skpd::where('status', 'diperiksa')->count();
+
+        /*
+         * Lencana menghitung dokumen yang menunggu tindakan pengguna ini,
+         * bukan sekadar dokumen yang sedang berjalan. Sebelumnya keduanya
+         * mencari status 'diperiksa' - status yang tidak pernah dipakai -
+         * sehingga angkanya selamanya nol.
+         *
+         * Sekretaris tidak lagi muncul di sini: ia tidak punya tahap apa pun
+         * pada alur SKPD sejak kewenangan menugaskan dipegang Dirut dan para
+         * direktur.
+         */
+        if ($userRole === 'dirut') {
+            $skpdPendingCount = \App\Models\Skpd::where('status', 'menunggu_dirut')->count();
             $suratKeluarPendingCount = \App\Models\SuratKeluar::where('status', 'menunggu_dirut')->count();
+        } elseif ($userRole === 'sekretaris') {
+            $suratKeluarPendingCount = \App\Models\SuratKeluar::where('status', 'menunggu_sekretaris')->count();
+        } elseif (auth()->user()->isDirektur() && auth()->user()->unit) {
+            // Direktur bidang menilai usulan pegawai di direktoratnya sendiri.
+            $skpdPendingCount = \App\Models\Skpd::where('status', 'menunggu_direktur')
+                ->whereHas('user', fn ($q) => $q->where('unit', auth()->user()->unit))
+                ->count();
         }
         $disposisiPendingCount = \App\Models\Disposisi::where('kepada_user_id', auth()->id())->where('status', 'menunggu')->count();
     }
 @endphp
 
 <!-- Sidebar -->
-<aside class="w-64 bg-slate-900 text-slate-300 flex flex-col shadow-2xl z-20 relative flex-shrink-0">
+{{-- Di layar kecil sidebar melayang di atas isi halaman dan disembunyikan
+     sampai tombol menu ditekan; mulai lg ia kembali menjadi kolom biasa. --}}
+<aside id="sidebar"
+       class="w-64 bg-slate-900 text-slate-300 flex flex-col shadow-2xl flex-shrink-0
+              fixed inset-y-0 left-0 z-40 -translate-x-full transition-transform duration-200
+              lg:static lg:translate-x-0 lg:z-20">
     <!-- Logo -->
     <div class="p-6 border-b border-slate-800 flex items-center gap-3">
         <div class="w-10 h-10 bg-white rounded-lg p-1">
@@ -176,7 +195,12 @@
         @endif
 
         <!-- Laporan Section (Permission-based) -->
-        @if(auth()->user()->hasPermission('akses_laporan_surat_masuk') || auth()->user()->hasPermission('akses_laporan_surat_keluar') || auth()->user()->hasPermission('akses_laporan_disposisi') || auth()->user()->hasPermission('akses_laporan_skpd'))
+        @php
+            // Laporan Disposisi dibatasi jabatan, bukan izin - lihat
+            // Disposisi::bolehLihatLaporan.
+            $bolehLaporanDisposisi = \App\Models\Disposisi::bolehLihatLaporan(auth()->user());
+        @endphp
+        @if(auth()->user()->hasPermission('akses_laporan_surat_masuk') || auth()->user()->hasPermission('akses_laporan_surat_keluar') || $bolehLaporanDisposisi || auth()->user()->hasPermission('akses_laporan_skpd'))
             <div class="pt-4 pb-1">
                 <p class="px-4 text-[10px] font-bold text-slate-500 uppercase tracking-wider">Laporan & Rekapitulasi</p>
             </div>
@@ -199,7 +223,7 @@
                 </a>
             @endif
 
-            @if(auth()->user()->hasPermission('akses_laporan_disposisi'))
+            @if($bolehLaporanDisposisi)
                 <!-- Laporan Disposisi -->
                 <a href="{{ route('laporan.disposisi') }}" 
                    class="flex items-center gap-3 px-4 py-3 rounded-xl font-medium transition-all {{ request()->routeIs('laporan.disposisi') ? 'bg-blue-600 text-white shadow-md shadow-blue-500/20' : 'hover:bg-slate-800 hover:text-white' }}">

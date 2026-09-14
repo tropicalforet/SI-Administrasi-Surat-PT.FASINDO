@@ -128,9 +128,9 @@ Route::delete(
         )->name('surat-keluar.submit');
 
         Route::put(
-            '/surat-keluar/{surat_keluar}/verifikasi',
-            [SuratKeluarController::class, 'verifikasi']
-        )->name('surat-keluar.verifikasi');
+            '/surat-keluar/{surat_keluar}/proses-sekretaris',
+            [SuratKeluarController::class, 'prosesSekretaris']
+        )->name('surat-keluar.proses-sekretaris');
 
         Route::put(
             '/surat-keluar/{surat_keluar}/approve',
@@ -212,20 +212,6 @@ Route::delete(
         )->name('disposisi.destroy');
     });
 
-    /*
-    |--------------------------------------------------------------------------
-    | Test Role
-    |--------------------------------------------------------------------------
-    */
-
-    Route::get('/test-dirut', function () {
-        return 'Halaman Direktur Utama';
-    })->middleware(['role:dirut']);
-
-    Route::get('/test-sekretaris', function () {
-        return 'Halaman Sekretaris';
-    })->middleware(['role:sekretaris']);
-
     Route::middleware('permission:akses_disposisi')->group(function () {
         Route::get(
             '/disposisi-saya',
@@ -265,6 +251,17 @@ Route::middleware('permission:akses_disposisi')->group(function () {
         '/disposisi/{disposisi}',
         [DisposisiController::class, 'update']
     )->name('disposisi.update');
+
+    // Penutupan disposisi ada di tangan pemberinya, bukan penerimanya.
+    Route::put(
+        '/disposisi/{disposisi}/verifikasi',
+        [DisposisiController::class, 'verifikasi']
+    )->name('disposisi.verifikasi');
+
+    Route::put(
+        '/disposisi/{disposisi}/kembalikan',
+        [DisposisiController::class, 'kembalikan']
+    )->name('disposisi.kembalikan');
 });
 
 /*
@@ -285,8 +282,9 @@ Route::prefix('laporan')->name('laporan.')->group(function () {
         Route::get('/surat-keluar/pdf', [App\Http\Controllers\ReportController::class, 'suratKeluarPdf'])->name('surat-keluar.pdf');
     });
 
-    // Laporan Disposisi
-    Route::middleware('permission:akses_laporan_disposisi')->group(function () {
+    // Laporan Disposisi - kontrol manajemen, dibatasi jabatan bukan izin.
+    // Lihat Disposisi::ROLE_LAPORAN.
+    Route::middleware('role:' . implode(',', App\Models\Disposisi::ROLE_LAPORAN))->group(function () {
         Route::get('/disposisi', [App\Http\Controllers\ReportController::class, 'disposisi'])->name('disposisi');
         Route::get('/disposisi/pdf', [App\Http\Controllers\ReportController::class, 'disposisiPdf'])->name('disposisi.pdf');
     });

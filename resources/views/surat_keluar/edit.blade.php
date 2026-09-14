@@ -1,21 +1,15 @@
-<!DOCTYPE html>
+@extends('layouts.app')
 
-<html lang="id">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Edit Surat Keluar - E-Office</title>
-    <script src="https://cdn.tailwindcss.com"></script>
-</head>
-<body class="bg-gray-100 flex items-center justify-center min-h-screen font-sans p-6">
+@section('content')
+<div class="py-10 px-4 sm:px-6 flex justify-center">
 
 <div class="bg-white p-8 rounded-xl shadow-lg w-full max-w-lg">
 
     <div class="mb-6">
 
-        <a href="{{ route('dashboard') }}"
+        <a href="{{ route('surat-keluar.index') }}"
            class="inline-flex items-center px-3 py-2 bg-gray-100 hover:bg-gray-200 rounded-lg text-sm font-medium text-gray-700 mb-4">
-            ← Dashboard
+            ← Kembali ke Surat Keluar
         </a>
 
         <h2 class="text-2xl font-bold text-gray-800">
@@ -60,9 +54,13 @@
             </label>
 
             <input type="text"
-                   value="{{ $surat_keluar->nomor_surat }}"
+                   value="{{ $surat_keluar->label_nomor }}"
                    readonly
-                   class="w-full px-4 py-2.5 bg-gray-50 border border-gray-300 rounded-lg">
+                   class="w-full px-4 py-2.5 bg-gray-50 border border-gray-300 rounded-lg text-gray-700">
+
+            <p class="text-xs text-gray-500 mt-1">
+                Nomor diterbitkan sekretaris setelah konsep diajukan dan diperiksa.
+            </p>
         </div>
 
         <div>
@@ -76,10 +74,6 @@
                    required
                    class="w-full px-4 py-2.5 bg-gray-50 border border-gray-300 rounded-lg">
         </div>
-
-        @include('surat_keluar.partials.unit-verifikasi', [
-            'unitVerifikasi' => old('unit_verifikasi', $surat_keluar->unit_verifikasi),
-        ])
 
         <div>
             <label class="block text-sm font-medium text-gray-700 mb-2">
@@ -154,30 +148,25 @@
             </div>
         </div>
 
+        {{--
+            Status tidak dapat dipilih sendiri. Ia berubah mengikuti alur:
+            draft saat disimpan, menunggu sekretaris saat diajukan, menunggu
+            dirut setelah dinomori, dan terkirim setelah ditandatangani.
+            Sebelumnya di sini ada dropdown status yang nilainya bahkan tidak
+            pernah disimpan controller - hanya menyesatkan penyusun surat.
+        --}}
         <div>
             <label class="block text-sm font-medium text-gray-700 mb-2">
                 Status Surat
             </label>
 
-            <select name="status"
-                    class="w-full px-4 py-2.5 bg-gray-50 border border-gray-300 rounded-lg">
+            <div class="w-full px-4 py-2.5 bg-gray-50 border border-gray-300 rounded-lg text-gray-700">
+                {{ $surat_keluar->label_status }}
+            </div>
 
-                <option value="draft"
-                    {{ $surat_keluar->status == 'draft' ? 'selected' : '' }}>
-                    Draft
-                </option>
-
-                <option value="dikirim"
-                    {{ $surat_keluar->status == 'dikirim' ? 'selected' : '' }}>
-                    Dikirim
-                </option>
-
-                <option value="selesai"
-                    {{ $surat_keluar->status == 'selesai' ? 'selected' : '' }}>
-                    Selesai
-                </option>
-
-            </select>
+            <p class="text-xs text-gray-500 mt-1">
+                Status berubah otomatis mengikuti alur persetujuan dan tidak dapat diubah manual.
+            </p>
         </div>
 
         <div class="flex items-center justify-end gap-3 pt-6 border-t border-gray-100 mt-2">
@@ -198,5 +187,5 @@
 
 </div>
 
-</body>
-</html>
+</div>
+@endsection

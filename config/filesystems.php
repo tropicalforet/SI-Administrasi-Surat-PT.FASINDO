@@ -40,7 +40,19 @@ return [
 
         'public' => [
             'driver' => 'local',
-            'root' => storage_path('app/public'),
+
+            /*
+             * Berkas unggahan biasanya disimpan di storage/app/public lalu
+             * disambungkan ke folder publik memakai symbolic link. Sebagian
+             * layanan shared hosting tidak mengizinkan symbolic link, dan
+             * susunan foldernya pun memisahkan inti aplikasi dari document
+             * root. PUBLIC_DISK_ROOT memungkinkan berkas ditulis langsung ke
+             * folder yang dapat dibaca peramban, tanpa perlu symbolic link.
+             *
+             * Dibiarkan kosong di lingkungan pengembangan, sehingga jalur
+             * bawaan Laravel tetap dipakai.
+             */
+            'root' => env('PUBLIC_DISK_ROOT', storage_path('app/public')),
             'url' => rtrim(env('APP_URL', 'http://localhost'), '/').'/storage',
             'visibility' => 'public',
             'throw' => false,

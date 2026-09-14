@@ -47,20 +47,18 @@ test('surat yang ditolak dapat diperbarui tanpa kehilangan catatan revisi', func
         ->and($surat->catatan_revisi)->toBe('Perbaiki tanggal rapat.');
 });
 
-test('surat yang ditolak dapat diajukan ulang, kembali dari tahap verifikasi', function () {
-    // Sejak verifikasi berjenjang berlaku, pengajuan ulang masuk lagi ke direktur
-    // bidangnya lebih dulu, bukan langsung ke Direktur Utama.
-    User::factory()->create(['role' => 'direktur2', 'unit' => 'teknik']);
-
+test('surat yang ditolak dapat diajukan ulang ke sekretaris', function () {
+    // Tahap verifikasi direktur sudah dilepas: pengajuan ulang langsung
+    // kembali ke sekretaris untuk dinomori.
     $surat = suratDitolak();
 
     $this->actingAs(sekretaris())
         ->put('/surat-keluar/' . $surat->id . '/submit')
-        ->assertRedirect(route('surat-keluar.index'));
+        ->assertRedirect(route('surat-keluar.show', $surat->id));
 
     $surat->refresh();
 
-    expect($surat->status)->toBe('menunggu_direktur')
+    expect($surat->status)->toBe('menunggu_sekretaris')
         ->and($surat->catatan_revisi)->toBeNull();
 });
 

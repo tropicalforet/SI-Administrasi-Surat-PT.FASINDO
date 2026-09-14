@@ -1,4 +1,4 @@
-@extends('layouts.app')
+﻿@extends('layouts.app')
 
 @section('content')
 <div class="p-4 sm:p-6 lg:p-8">
@@ -66,9 +66,9 @@
                         <td class="py-4 px-6 whitespace-nowrap">
                             <div class="flex items-center gap-2">
                                 <div class="w-7 h-7 rounded-full bg-blue-100 text-blue-600 flex items-center justify-center font-bold text-xs">
-                                    {{ substr($item->dariUser->name, 0, 1) }}
+                                    {{ substr($item->label_pengirim, 0, 1) }}
                                 </div>
-                                <span class="font-medium text-slate-700">{{ $item->dariUser->name }}</span>
+                                <span class="font-medium text-slate-700">{{ $item->label_pengirim }}</span>
                             </div>
                         </td>
 
@@ -104,19 +104,12 @@
                         </td>
 
                         <td class="py-4 px-6 text-center">
-                            @if(strtolower($item->status) == 'menunggu')
-                                <span class="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold bg-yellow-50 text-yellow-700 border border-yellow-200">
-                                    Menunggu
-                                </span>
-                            @elseif(strtolower($item->status) == 'diproses')
-                                <span class="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold bg-blue-50 text-blue-700 border border-blue-200">
-                                    Diproses
-                                </span>
-                            @else
-                                <span class="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200">
-                                    Selesai
-                                </span>
-                            @endif
+                            {{-- Sebutan dan warnanya diambil dari model, agar
+                                 status yang bertambah tidak perlu ditambahkan
+                                 ulang di tiap tampilan. --}}
+                            <span class="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold border {{ $item->warna_status }}">
+                                {{ $item->label_status }}
+                            </span>
                             
                             @if($item->file_tindak_lanjut)
                                 <div class="mt-1.5">
@@ -133,11 +126,24 @@
 
                         <td class="py-4 px-6">
                             <div class="flex justify-center items-center gap-2">
-                                <a href="{{ route('disposisi.edit', $item->id) }}"
-                                   class="bg-blue-50 text-blue-600 hover:bg-blue-100 hover:text-blue-700 border border-blue-100 px-4 py-2 rounded-lg text-xs font-semibold transition-colors whitespace-nowrap flex items-center gap-1.5 shadow-sm">
-                                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 15l-2 5L9 9l11 4-5 2zm0 0l5 5M7.188 2.239l.777 2.897M5.136 7.965l-2.898-.777M13.95 4.05l-2.122 2.122m-5.657 5.656l-2.12 2.122"></path></svg>
-                                    Tindak Lanjut
-                                </a>
+                                {{-- Tombol tindak lanjut hanya berlaku selama
+                                     disposisinya masih terbuka. Dulu tombol ini
+                                     tetap muncul walau statusnya sudah selesai,
+                                     sehingga terbaca seolah pekerjaannya masih
+                                     dapat diubah. --}}
+                                @if($item->bolehDitindaklanjutiOleh(auth()->user()))
+                                    <a href="{{ route('disposisi.edit', $item->id) }}"
+                                       class="bg-blue-50 text-blue-600 hover:bg-blue-100 hover:text-blue-700 border border-blue-100 px-4 py-2 rounded-lg text-xs font-semibold transition-colors whitespace-nowrap flex items-center gap-1.5 shadow-sm">
+                                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 15l-2 5L9 9l11 4-5 2zm0 0l5 5M7.188 2.239l.777 2.897M5.136 7.965l-2.898-.777M13.95 4.05l-2.122 2.122m-5.657 5.656l-2.12 2.122"></path></svg>
+                                        Tindak Lanjut
+                                    </a>
+                                @else
+                                    <a href="{{ route('disposisi.edit', $item->id) }}"
+                                       class="bg-slate-50 text-slate-500 hover:bg-slate-100 border border-slate-200 px-4 py-2 rounded-lg text-xs font-semibold transition-colors whitespace-nowrap flex items-center gap-1.5"
+                                       title="{{ $item->menungguVerifikasi() ? 'Menunggu verifikasi ' . $item->label_pengirim : 'Disposisi sudah selesai' }}">
+                                        Lihat
+                                    </a>
+                                @endif
 
                                 @if(in_array(strtolower(auth()->user()->role ?? ''), ['dirut', 'direktur1', 'direktur2', 'sekretaris', 'staff']))
                                 <form action="{{ route('disposisi.destroy', $item->id) }}"

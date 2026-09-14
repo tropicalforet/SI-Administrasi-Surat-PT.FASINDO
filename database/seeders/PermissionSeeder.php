@@ -24,8 +24,10 @@ class PermissionSeeder extends Seeder
             // Laporan
             ['name' => 'akses_laporan_surat_masuk',  'label' => 'Lap. Surat Masuk',    'group' => 'Laporan'],
             ['name' => 'akses_laporan_surat_keluar', 'label' => 'Lap. Surat Keluar',   'group' => 'Laporan'],
-            ['name' => 'akses_laporan_disposisi',    'label' => 'Lap. Disposisi',       'group' => 'Laporan'],
             ['name' => 'akses_laporan_skpd',         'label' => 'Lap. SKPD',           'group' => 'Laporan'],
+
+            // Laporan Disposisi tidak punya izin: aksesnya melekat pada
+            // jabatan Dirut dan Sekretaris - lihat Disposisi::ROLE_LAPORAN.
         ];
 
         foreach ($permissions as $perm) {

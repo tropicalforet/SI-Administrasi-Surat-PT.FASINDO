@@ -54,14 +54,49 @@
     </style>
 
     @include('layouts.partials.confirm-modal')
-    </div>
+
+    {{-- Latar gelap saat menu dibuka di layar kecil --}}
+    <div id="tirai" class="fixed inset-0 bg-slate-900/50 z-30 hidden lg:hidden"></div>
 
     @include('layouts.partials.sidebar')
 
-    <!-- Main Content -->
-    <main class="flex-1 overflow-y-auto bg-slate-50">
-        @yield('content')
-    </main>
+    {{-- Kolom kanan: bilah identitas di atas, isi halaman di bawahnya --}}
+    <div class="flex-1 flex flex-col overflow-hidden min-w-0">
+        @include('layouts.partials.topbar')
+
+        <!-- Main Content -->
+        <main class="flex-1 overflow-y-auto bg-slate-50">
+            @yield('content')
+        </main>
+    </div>
+
+    <script>
+        (function () {
+            var sidebar = document.getElementById('sidebar');
+            var tirai   = document.getElementById('tirai');
+            var tombol  = document.getElementById('tombolMenu');
+
+            if (!sidebar || !tirai || !tombol) return;
+
+            function buka() {
+                sidebar.classList.remove('-translate-x-full');
+                tirai.classList.remove('hidden');
+            }
+
+            function tutup() {
+                sidebar.classList.add('-translate-x-full');
+                tirai.classList.add('hidden');
+            }
+
+            tombol.addEventListener('click', buka);
+            tirai.addEventListener('click', tutup);
+
+            // Menutup dengan Esc, karena tirai bisa terlewat di layar sempit
+            document.addEventListener('keydown', function (e) {
+                if (e.key === 'Escape') tutup();
+            });
+        })();
+    </script>
 
     {{-- ===== SaaS Toast Notification Engine ===== --}}
     <script>

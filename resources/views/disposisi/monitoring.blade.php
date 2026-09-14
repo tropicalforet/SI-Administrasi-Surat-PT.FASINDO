@@ -1,16 +1,7 @@
-<!DOCTYPE html>
-<html lang="id">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Monitoring Disposisi - E-Office</title>
-    <script src="https://cdn.tailwindcss.com"></script>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
-    <style>
-        body { font-family: 'Inter', sans-serif; }
-    </style>
-</head>
-<body class="bg-slate-50 text-slate-800 p-4 sm:p-6 lg:p-8 min-h-screen">
+﻿@extends('layouts.app')
+
+@section('content')
+<div class="p-4 sm:p-6 lg:p-8">
 
 <div class="max-w-7xl mx-auto">
 
@@ -46,19 +37,9 @@
                     </h2>
                     
                     <div>
-                        @if($item->status == 'menunggu')
-                            <span class="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold bg-yellow-50 text-yellow-700 border border-yellow-200 whitespace-nowrap">
-                                Menunggu
-                            </span>
-                        @elseif($item->status == 'diproses')
-                            <span class="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold bg-blue-50 text-blue-700 border border-blue-200 whitespace-nowrap">
-                                Diproses
-                            </span>
-                        @else
-                            <span class="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200 whitespace-nowrap">
-                                Selesai
-                            </span>
-                        @endif
+                        <span class="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold border whitespace-nowrap {{ $item->warna_status }}">
+                            {{ $item->label_status }}
+                        </span>
                     </div>
                 </div>
 
@@ -71,7 +52,7 @@
             <div class="space-y-2 text-sm text-slate-500 mb-5">
                 <div class="flex items-center gap-2">
                     <svg class="w-4 h-4 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"></path></svg>
-                    <span>Kepada: <span class="font-semibold text-slate-700">{{ $item->kepadaUser->name }}</span></span>
+                    <span>Kepada: <span class="font-semibold text-slate-700">{{ $item->label_penerima }}</span></span>
                 </div>
                 <div class="flex items-center gap-2">
                     <svg class="w-4 h-4 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"></path></svg>
@@ -112,6 +93,7 @@
                                 @php
                                     $stripColor = match(strtolower($child->status)) {
                                         'selesai' => 'bg-emerald-400',
+                                        'menunggu_verifikasi' => 'bg-violet-400',
                                         'diproses' => 'bg-blue-400',
                                         default => 'bg-yellow-400',
                                     };
@@ -120,16 +102,20 @@
 
                                 <div class="flex justify-between items-start mb-1.5 pl-1.5">
                                     <div class="font-bold text-sm text-slate-700">
-                                        {{ $child->kepadaUser->name }}
+                                        {{ $child->label_penerima }}
                                     </div>
                                     <div>
-                                        @if(strtolower($child->status) == 'menunggu')
-                                            <span class="text-[10px] font-bold uppercase tracking-wider text-yellow-600 bg-yellow-100 px-2 py-0.5 rounded-full">Menunggu</span>
-                                        @elseif(strtolower($child->status) == 'diproses')
-                                            <span class="text-[10px] font-bold uppercase tracking-wider text-blue-600 bg-blue-100 px-2 py-0.5 rounded-full">Diproses</span>
-                                        @else
-                                            <span class="text-[10px] font-bold uppercase tracking-wider text-emerald-600 bg-emerald-100 px-2 py-0.5 rounded-full">Selesai</span>
-                                        @endif
+                                        @php
+                                            $warnaAnak = match(strtolower($child->status)) {
+                                                'selesai' => 'text-emerald-600 bg-emerald-100',
+                                                'menunggu_verifikasi' => 'text-violet-600 bg-violet-100',
+                                                'diproses' => 'text-blue-600 bg-blue-100',
+                                                default => 'text-yellow-600 bg-yellow-100',
+                                            };
+                                        @endphp
+                                        <span class="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full {{ $warnaAnak }}">
+                                            {{ $child->label_status }}
+                                        </span>
                                     </div>
                                 </div>
 
@@ -204,6 +190,6 @@
 
 </div>
 
-@include('layouts.partials.confirm-modal')
-</body>
-</html>
+
+</div>
+@endsection

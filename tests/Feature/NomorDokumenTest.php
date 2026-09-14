@@ -45,37 +45,41 @@ test('nomor melanjutkan dari counter yang sudah terisi', function () {
 });
 
 test('nomor skpd tidak terulang setelah data dihapus', function () {
-    $sekretaris = User::factory()->create(['role' => 'sekretaris', 'unit' => 'pimpinan']);
+    $dirut = User::factory()->create(['role' => 'dirut', 'unit' => 'pimpinan']);
     $pegawai = User::factory()->create(['role' => 'staff', 'unit' => 'teknik']);
 
-    $buat = function () use ($sekretaris, $pegawai) {
-        $this->actingAs($sekretaris)->post('/skpd', [
+    $ajukan = function (string $aksi) use ($dirut, $pegawai) {
+        $this->actingAs($dirut)->post('/skpd', [
             'user_id'           => $pegawai->id,
-            'jenis'             => 'perjalanan_dinas',
             'keperluan'         => 'Kunjungan kerja',
             'tujuan_dinas'      => 'Surabaya',
             'tanggal_berangkat' => '2026-09-01',
             'tanggal_kembali'   => '2026-09-03',
-            'aksi'              => 'draft',
+            'aksi'              => $aksi,
         ]);
 
         return App\Models\Skpd::latest('id')->first();
     };
 
-    $pertama = $buat();
-    $kedua = $buat();
+    $setujui = function (App\Models\Skpd $skpd) use ($dirut) {
+        $this->actingAs($dirut)->put('/skpd/' . $skpd->id . '/approve');
 
-    // Skema lama memakai max(id)+1, sehingga menghapus data terakhir
-    // membuat nomor berikutnya mengulang nomor yang sudah dipakai.
-    $this->actingAs($sekretaris)->delete('/skpd/' . $kedua->id);
+        return $skpd->fresh();
+    };
 
-    $ketiga = $buat();
+    $pertama = $setujui($ajukan('ajukan'));
+    $kedua   = $setujui($ajukan('ajukan'));
 
-    $semua = [
-        $pertama->nomor_skpd,
-        $kedua->nomor_skpd,
-        $ketiga->nomor_skpd,
-    ];
+    // Skema lama memakai max(id)+1, sehingga menghapus data terakhir membuat
+    // nomor berikutnya mengulang nomor yang sudah dipakai. Penghitung terpisah
+    // tidak pernah mundur, walau datanya dihapus.
+    $dibuang = $ajukan('draft');
+    $this->actingAs($dirut)->delete('/skpd/' . $dibuang->id);
 
-    expect(array_unique($semua))->toHaveCount(3);
+    $ketiga = $setujui($ajukan('ajukan'));
+
+    $semua = [$pertama->nomor_skpd, $kedua->nomor_skpd, $ketiga->nomor_skpd];
+
+    expect(array_filter($semua))->toHaveCount(3)
+        ->and(array_unique($semua))->toHaveCount(3);
 });

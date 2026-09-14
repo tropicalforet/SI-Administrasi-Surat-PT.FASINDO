@@ -1,4 +1,4 @@
-@php
+﻿@php
     if (!function_exists('collectDisposisiChain')) {
         function collectDisposisiChain($node) {
             $items = [$node];
@@ -13,19 +13,10 @@
         return strcmp($a->tanggal_disposisi, $b->tanggal_disposisi);
     });
 @endphp
-<!DOCTYPE html>
-<html lang="id">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Detail Monitoring Disposisi - E-Office</title>
-    <script src="https://cdn.tailwindcss.com"></script>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
-    <style>
-        body { font-family: 'Inter', sans-serif; }
-    </style>
-</head>
-<body class="bg-slate-50 text-slate-800 p-4 sm:p-6 lg:p-8 min-h-screen">
+@extends('layouts.app')
+
+@section('content')
+<div class="p-4 sm:p-6 lg:p-8">
 
 <div class="max-w-7xl mx-auto">
 
@@ -62,14 +53,69 @@
                     </h2>
                     
                     <!-- Status Badge Utama -->
-                    @if($disposisi->status == 'menunggu')
-                        <span class="inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold bg-yellow-50 text-yellow-700 border border-yellow-200">Menunggu</span>
-                    @elseif($disposisi->status == 'diproses')
-                        <span class="inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold bg-blue-50 text-blue-700 border border-blue-200">Diproses</span>
-                    @else
-                        <span class="inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200">Selesai</span>
-                    @endif
+                    <span class="inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold border {{ $disposisi->warna_status }}">
+                        {{ $disposisi->label_status }}
+                    </span>
                 </div>
+
+                {{-- Penutupan disposisi ada di tangan pemberinya. Kartu ini
+                     hanya muncul bagi pihak yang memberi perintah, dan hanya
+                     ketika penerimanya sudah menyatakan pekerjaannya rampung. --}}
+                @if($disposisi->bolehDiverifikasiOleh(auth()->user()))
+                    <div class="mb-6 rounded-xl border border-violet-200 bg-violet-50 p-5">
+                        <p class="text-sm font-bold text-violet-900">
+                            {{ $disposisi->label_penerima }} menyatakan pekerjaannya rampung
+                        </p>
+                        <p class="mt-1.5 text-sm text-violet-800 leading-relaxed">
+                            Periksa catatan dan lampiran hasil kerjanya di bawah. Bila sudah sesuai,
+                            setujui untuk menutup disposisi ini. Bila belum, kembalikan beserta
+                            catatan perbaikannya.
+                        </p>
+
+                        <div class="mt-4 flex flex-wrap items-center gap-2">
+                            <form action="{{ route('disposisi.verifikasi', $disposisi->id) }}"
+                                  method="POST"
+                                  onsubmit="event.preventDefault(); ConfirmModal.show({title:'Setujui Tindak Lanjut',message:'Disposisi ini akan dinyatakan selesai dan tidak dapat diubah lagi. Lanjutkan?',variant:'success',confirmText:'Ya, Setujui'}).then(ok=>{if(ok)this.submit()})"
+                                  class="inline">
+                                @csrf
+                                @method('PUT')
+                                <button type="submit"
+                                        class="px-5 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-semibold rounded-xl shadow transition-colors">
+                                    Setujui &amp; Tutup Disposisi
+                                </button>
+                            </form>
+
+                            <button type="button"
+                                    onclick="document.getElementById('form-kembalikan').classList.toggle('hidden')"
+                                    class="px-5 py-2.5 bg-white hover:bg-slate-50 text-slate-700 border border-slate-300 text-sm font-semibold rounded-xl transition-colors">
+                                Kembalikan untuk Diperbaiki
+                            </button>
+                        </div>
+
+                        <form id="form-kembalikan"
+                              action="{{ route('disposisi.kembalikan', $disposisi->id) }}"
+                              method="POST"
+                              class="hidden mt-4">
+                            @csrf
+                            @method('PUT')
+                            <label class="block text-xs font-bold text-violet-900 mb-1.5">
+                                Catatan perbaikan
+                            </label>
+                            <textarea name="catatan_verifikasi"
+                                      rows="3"
+                                      required
+                                      class="w-full px-4 py-3 bg-white border border-violet-200 rounded-xl text-sm text-slate-800 outline-none focus:ring-2 focus:ring-violet-400 resize-none"
+                                      placeholder="Sebutkan apa yang perlu diperbaiki. Catatan ini dibaca {{ $disposisi->label_penerima }}.">{{ old('catatan_verifikasi') }}</textarea>
+                            @error('catatan_verifikasi')
+                                <p class="text-red-600 text-xs mt-1.5">{{ $message }}</p>
+                            @enderror
+                            <button type="submit"
+                                    class="mt-3 px-5 py-2.5 bg-amber-600 hover:bg-amber-700 text-white text-sm font-semibold rounded-xl shadow transition-colors">
+                                Kirim Pengembalian
+                            </button>
+                        </form>
+                    </div>
+                @endif
 
                 <div class="space-y-4 text-sm">
                     <div>
@@ -91,9 +137,9 @@
                         <span class="block text-xs font-semibold text-slate-500 mb-1">Ditujukan Kepada</span>
                         <div class="flex items-center gap-2 mt-1">
                             <div class="w-6 h-6 rounded-full bg-slate-200 flex items-center justify-center text-slate-500 text-xs font-bold">
-                                {{ substr($disposisi->kepadaUser->name, 0, 1) }}
+                                {{ substr($disposisi->label_penerima, 0, 1) }}
                             </div>
-                            <span class="font-medium text-slate-800">{{ $disposisi->kepadaUser->name }}</span>
+                            <span class="font-medium text-slate-800">{{ $disposisi->label_penerima }}</span>
                         </div>
                     </div>
                 </div>
@@ -141,14 +187,11 @@
                             @php
                                 $statusColor = match($item->status) {
                                     'selesai' => 'bg-emerald-500 text-white',
+                                    'menunggu_verifikasi' => 'bg-violet-500 text-white',
                                     'diproses' => 'bg-blue-500 text-white',
                                     default => 'bg-yellow-500 text-slate-900',
                                 };
-                                $statusLabel = match($item->status) {
-                                    'selesai' => 'Selesai',
-                                    'diproses' => 'Diproses',
-                                    default => 'Menunggu',
-                                };
+                                $statusLabel = $item->label_status;
                                 
                                 $isStepOverdue = $item->status !== 'selesai' && $item->batas_waktu && \Carbon\Carbon::parse($item->batas_waktu)->isPast() && !\Carbon\Carbon::parse($item->batas_waktu)->isToday();
                                 $isStepDueToday = $item->status !== 'selesai' && $item->batas_waktu && \Carbon\Carbon::parse($item->batas_waktu)->isToday();
@@ -163,15 +206,15 @@
                                 <div class="bg-white border border-slate-200 rounded-2xl p-5 hover:border-slate-300 transition-all hover:shadow-md relative overflow-hidden">
                                     
                                     <!-- Status strip -->
-                                    <div class="absolute left-0 top-0 bottom-0 w-1.5 @if($item->status == 'selesai') bg-emerald-500 @elseif($item->status == 'diproses') bg-blue-500 @else bg-yellow-500 @endif"></div>
+                                    <div class="absolute left-0 top-0 bottom-0 w-1.5 {{ str_replace(' text-white', '', str_replace(' text-slate-900', '', $statusColor)) }}"></div>
 
                                     <!-- Step Header -->
                                     <div class="flex flex-col sm:flex-row sm:justify-between sm:items-start gap-3 mb-4 pl-2">
                                         <div>
                                             <div class="flex items-center gap-2 flex-wrap">
-                                                <span class="font-bold text-slate-800 text-sm sm:text-base">{{ $item->dariUser->name }}</span>
+                                                <span class="font-bold text-slate-800 text-sm sm:text-base">{{ $item->label_pengirim }}</span>
                                                 <svg class="w-4 h-4 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14 5l7 7m0 0l-7 7m7-7H3"></path></svg>
-                                                <span class="font-bold text-slate-800 text-sm sm:text-base">{{ $item->kepadaUser->name }}</span>
+                                                <span class="font-bold text-slate-800 text-sm sm:text-base">{{ $item->label_penerima }}</span>
                                             </div>
                                             <p class="text-[10px] text-slate-400 mt-1 flex items-center gap-1">
                                                 <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"></path></svg>
@@ -254,5 +297,5 @@
 
 </div>
 
-</body>
-</html>
+</div>
+@endsection

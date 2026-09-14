@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\SuratKeluar;
+use App\Models\User;
 use App\Helpers\ActivityHelper;
 use App\Helpers\NomorDokumenHelper;
 use App\Notifications\SuratKeluarMenungguTindakan;
@@ -14,14 +15,7 @@ class SuratKeluarController extends Controller
 {
     public function index(Request $request)
     {
-        $query = SuratKeluar::query();
-        
-        $role = strtolower(auth()->user()->role);
-        
-        // Surat keluar berstatus draft hanya boleh dilihat oleh sekretaris dan admin
-        if (!in_array($role, ['admin', 'administrator', 'superadmin', 'sekretaris'])) {
-            $query->where('status', '!=', 'draft');
-        }
+        $query = SuratKeluar::with('pembuat')->terlihatOleh(auth()->user());
         
         // Pencarian Dinamis
         if ($request->filled('search')) {
@@ -53,80 +47,157 @@ class SuratKeluarController extends Controller
 
     public function create()
     {
-        abort_unless(auth()->user()->role === 'sekretaris', 403, 'Akses ditolak.');
-        return view('surat_keluar.create');
+        // Konsep surat disusun pihak yang membutuhkannya - staf maupun manager -
+        // bukan lagi hanya sekretaris. Sekretaris berperan di tahap penomoran.
+        return view('surat_keluar.create', [
+            'unitBawaan' => $this->unitAsal(auth()->user()),
+        ]);
+    }
+
+    /**
+     * Unit asal penyusun, dicatat sebagai keterangan dari direktorat mana
+     * surat ini berasal. Tidak lagi menentukan alur karena tahap verifikasi
+     * direktur sudah dilepas.
+     */
+    private function unitAsal(\App\Models\User $user): ?string
+    {
+        return in_array($user->unit, ['keuangan_administrasi', 'teknik']) ? $user->unit : null;
+    }
+
+    /**
+     * Konsep hanya boleh diubah penyusunnya sendiri, atau sekretaris yang
+     * memang bertugas merapikan surat sebelum ditandatangani.
+     */
+    private function pastikanPenyusun(SuratKeluar $surat_keluar): void
+    {
+        if (strtolower(auth()->user()->role) !== 'sekretaris'
+            && $surat_keluar->dibuat_oleh !== auth()->id()) {
+            abort(403, 'Akses ditolak. Konsep ini bukan susunan Anda.');
+        }
+    }
+
+    private function simpanBerkas(Request $request, ?string $berkasLama = null): ?string
+    {
+        if (!$request->hasFile('file')) {
+            return $berkasLama;
+        }
+
+        if ($berkasLama && Storage::disk('public')->exists($berkasLama)) {
+            Storage::disk('public')->delete($berkasLama);
+        }
+
+        $file = $request->file('file');
+        $safePerihal = substr(preg_replace('/[^A-Za-z0-9_\-]/', '_', $request->perihal), 0, 100);
+
+        return $file->storeAs(
+            'surat_keluar',
+            $safePerihal . '_' . time() . '.' . $file->getClientOriginalExtension(),
+            'public'
+        );
+    }
+
+    /**
+     * Susun nomor surat resmi. Dipanggil di tahap sekretaris, saat surat sudah
+     * dipastikan akan terbit.
+     */
+    /**
+     * Bentuk nomor mengikuti kaidah tunggal di NomorDokumenHelper, sama
+     * dengan SKPD, sehingga seluruh dokumen perusahaan berformat seragam.
+     */
+    private function terbitkanNomor(SuratKeluar $surat_keluar): string
+    {
+        $kode = NomorDokumenHelper::kodeAman($surat_keluar->kategori_surat);
+
+        return NomorDokumenHelper::terbitkan('surat_keluar:' . $kode, $kode);
+    }
+
+    /**
+     * Tahap sekretaris: menerbitkan nomor dan memastikan formatnya sesuai
+     * standar, sebelum surat naik ke meja Direktur Utama.
+     */
+    public function prosesSekretaris(SuratKeluar $surat_keluar)
+    {
+        abort_unless(
+            strtolower(auth()->user()->role) === 'sekretaris',
+            403,
+            'Akses ditolak. Hanya sekretaris yang menomori surat keluar.'
+        );
+
+        if ($surat_keluar->status !== 'menunggu_sekretaris') {
+            return back()->with('error', 'Surat ini tidak sedang menunggu penomoran.');
+        }
+
+        // Nomor hanya diterbitkan sekali; pengajuan ulang memakai nomor yang sama.
+        $nomor = $surat_keluar->nomor_surat ?: $this->terbitkanNomor($surat_keluar);
+
+        // Nomor disimpan lebih dahulu, sebelum berkasnya diolah. Urutan ini
+        // penting: bila pengolahan dokumen gagal, nomor yang sudah terbit
+        // tetap melekat pada suratnya. Sebelumnya urutannya terbalik,
+        // sehingga satu kegagalan menghanguskan nomor yang sudah diambil dari
+        // penghitung dan meninggalkan lubang pada urutan nomor.
+        $surat_keluar->update([
+            'nomor_surat' => $nomor,
+            'status'      => 'menunggu_dirut',
+        ]);
+
+        // Penyematan nomor ke dokumen Word bersifat usaha terbaik.
+        if ($surat_keluar->file && str_ends_with(strtolower($surat_keluar->file), '.docx')) {
+            $this->imprintNomorSuratToWord(Storage::disk('public')->path($surat_keluar->file), $nomor);
+            $this->convertDocxToPdf($surat_keluar->file);
+        }
+
+        $this->beritahuDirut($surat_keluar);
+
+        ActivityHelper::log('Penomoran Surat Keluar', 'Menerbitkan nomor ' . $nomor . ' dan meneruskan ke Direktur Utama');
+
+        return back()->with('success', 'Nomor ' . $nomor . ' diterbitkan. Surat diteruskan ke Direktur Utama.');
     }
 
     public function store(Request $request)
     {
-        abort_unless(auth()->user()->role === 'sekretaris', 403, 'Akses ditolak.');
         
         $validated = $request->validate([
             'kategori_surat' => 'required|string',
             'kategori_surat_lainnya' => 'required_if:kategori_surat,Lainnya|string|nullable',
             'tanggal_surat'  => 'required|date',
-            'unit_verifikasi' => 'required|in:' . implode(',', array_keys(\App\Models\User::UNIT)),
             'tujuan'         => 'required|string',
             'perihal'        => 'required|string',
             'file'           => 'nullable|mimes:pdf,jpg,jpeg,png,doc,docx|max:5120',
+            'aksi'           => 'nullable|in:draft,ajukan',
         ]);
         
         $kategori = $validated['kategori_surat'] === 'Lainnya' ? $validated['kategori_surat_lainnya'] : $validated['kategori_surat'];
-        $tahun = date('Y');
-        
-        $bulanRomawi = [
-            1 => 'I', 2 => 'II', 3 => 'III', 4 => 'IV', 5 => 'V', 6 => 'VI',
-            7 => 'VII', 8 => 'VIII', 9 => 'IX', 10 => 'X', 11 => 'XI', 12 => 'XII',
-        ];
-        $bulan = $bulanRomawi[date('n')];
 
-        // Nomor diambil dari counter terkunci, bukan dari hasil pembacaan
-        // seluruh surat, agar dua sekretaris tidak mendapat nomor yang sama.
-        $nomorBaru = NomorDokumenHelper::next('surat_keluar:' . $kategori, (int) $tahun);
-
-        // Buat slug tujuan agar aman sebagai penomoran surat
-        $slugTujuan = strtoupper(preg_replace('/[^A-Za-z0-9]/', '-', $request->tujuan));
-        $slugTujuan = preg_replace('/-+/', '-', $slugTujuan);
-        $slugTujuan = trim($slugTujuan, '-');
-        $slugTujuan = substr($slugTujuan, 0, 30); // Batasi panjang slug
-
-        // Format Baru: [Nomor]/FI/[Kategori] [Slug_Tujuan]/[Bulan_Romawi]/[Tahun]
-        $nomor_surat = str_pad($nomorBaru, 3, '0', STR_PAD_LEFT) . '/FI/' . $kategori . ' ' . $slugTujuan . '/' . $bulan . '/' . $tahun;
-
-        $filePath = null;
-        if ($request->hasFile('file')) {
-            $file = $request->file('file');
-            $safePerihal = preg_replace('/[^A-Za-z0-9_\-]/', '_', $request->perihal);
-            $safePerihal = substr($safePerihal, 0, 100);
-            $fileName = $safePerihal . '_' . time() . '.' . $file->getClientOriginalExtension();
-            $filePath = $file->storeAs('surat_keluar', $fileName, 'public');
-
-            if (strtolower($file->getClientOriginalExtension()) === 'docx') {
-                $fullPath = storage_path('app/public/' . $filePath);
-                $this->imprintNomorSuratToWord($fullPath, $nomor_surat);
-                $this->convertDocxToPdf($filePath);
-            }
-        }
+        // Nomor sengaja BELUM diterbitkan di sini. Draf yang dibatalkan atau
+        // ditolak tidak boleh memakan nomor, sehingga rangkaiannya tetap utuh.
+        // Penomoran dilakukan sekretaris saat surat dipastikan akan terbit.
+        $filePath = $this->simpanBerkas($request);
 
         $suratKeluar = SuratKeluar::create([
-            'nomor_surat'    => $nomor_surat,
-            'kategori_surat' => $kategori,
-            'unit_verifikasi' => $validated['unit_verifikasi'],
-            'tanggal_surat'  => $validated['tanggal_surat'],
-            'tujuan'         => $request->tujuan,
-            'perihal'        => $request->perihal,
-            'file'           => $filePath,
-            'status'         => 'draft',
+            'dibuat_oleh'     => auth()->id(),
+            'nomor_surat'     => null,
+            'kategori_surat'  => $kategori,
+            'unit_verifikasi' => $this->unitAsal(auth()->user()),
+            'tanggal_surat'   => $validated['tanggal_surat'],
+            'tujuan'          => $request->tujuan,
+            'perihal'         => $request->perihal,
+            'file'            => $filePath,
+            'status'          => 'draft',
         ]);
-        
-        ActivityHelper::log('Tambah Surat Keluar', 'Menambahkan surat ' . $nomor_surat);
 
-        return redirect()->route('surat-keluar.index')->with('success', 'Surat keluar berhasil ditambahkan.');
+        ActivityHelper::log('Tambah Surat Keluar', 'Menyusun konsep surat: ' . $suratKeluar->perihal);
+
+        if ($request->input('aksi') === 'ajukan') {
+            return $this->submit($suratKeluar);
+        }
+
+        return redirect()->route('surat-keluar.show', $suratKeluar->id)
+            ->with('success', 'Konsep surat tersimpan sebagai draft.');
     }
 
     public function edit(SuratKeluar $surat_keluar)
     {
-        abort_unless(auth()->user()->role === 'sekretaris', 403, 'Akses ditolak.');
+        $this->pastikanPenyusun($surat_keluar);
 
         // Surat yang ditolak Dirut boleh diperbaiki, lalu diajukan ulang
         if (!in_array($surat_keluar->status, ['draft', 'ditolak'])) {
@@ -138,7 +209,7 @@ class SuratKeluarController extends Controller
     
     public function update(Request $request, SuratKeluar $surat_keluar)
     {
-        abort_unless(auth()->user()->role === 'sekretaris', 403, 'Akses ditolak.');
+        $this->pastikanPenyusun($surat_keluar);
 
         if (!in_array($surat_keluar->status, ['draft', 'ditolak'])) {
             return back()->with('error', 'Surat yang sudah diajukan tidak dapat diubah.');
@@ -146,7 +217,6 @@ class SuratKeluarController extends Controller
 
         $request->validate([
             'tanggal_surat' => 'required|date',
-            'unit_verifikasi' => 'required|in:' . implode(',', array_keys(\App\Models\User::UNIT)),
             'tujuan'        => 'required|string',
             'perihal'       => 'required|string',
             'file'          => 'nullable|mimes:pdf,jpg,jpeg,png,docx|max:5120',
@@ -165,14 +235,13 @@ class SuratKeluarController extends Controller
             $filePath = $file->storeAs('surat_keluar', $fileName, 'public');
 
             if (strtolower($file->getClientOriginalExtension()) === 'docx') {
-                $fullPath = storage_path('app/public/' . $filePath);
+                $fullPath = Storage::disk('public')->path($filePath);
                 $this->imprintNomorSuratToWord($fullPath, $surat_keluar->nomor_surat);
                 $this->convertDocxToPdf($filePath);
             }
         }
 
         $surat_keluar->update([
-            'unit_verifikasi' => $request->unit_verifikasi,
             'tanggal_surat' => $request->tanggal_surat,
             'tujuan'        => $request->tujuan,
             'perihal'       => $request->perihal,
@@ -186,7 +255,7 @@ class SuratKeluarController extends Controller
 
     public function submit(SuratKeluar $surat_keluar)
     {
-        abort_unless(auth()->user()->role === 'sekretaris', 403, 'Akses ditolak.');
+        $this->pastikanPenyusun($surat_keluar);
 
         // Hanya surat yang masih disusun atau baru ditolak yang boleh diajukan,
         // agar surat yang sudah disetujui tidak bisa dikembalikan ke antrean.
@@ -194,81 +263,85 @@ class SuratKeluarController extends Controller
             return back()->with('error', 'Surat ini sudah diajukan atau sudah disetujui.');
         }
 
-        $pemaraf = $surat_keluar->direkturVerifikator();
-
-        if (!$pemaraf) {
-            return back()->with('error', 'Belum ada direktur pada unit ' . $surat_keluar->label_unit_verifikasi . '. Hubungi administrator sebelum mengajukan surat ini.');
-        }
-
         $diajukanUlang = $surat_keluar->status === 'ditolak';
 
-        // Verifikasi direktur terkait mendahului persetujuan Direktur Utama.
-        // Verifikasi lama dikosongkan agar pengajuan ulang diperiksa dari awal.
+        // Konsep langsung menuju sekretaris untuk dinomori dan diperiksa
+        // formatnya; tidak ada lagi tahap verifikasi direktur bidang.
         $surat_keluar->update([
-            'status'               => 'menunggu_direktur',
-            'catatan_revisi'       => null,
-            'approved_direktur_by' => null,
-            'approved_direktur_at' => null,
+            'status'         => 'menunggu_sekretaris',
+            'catatan_revisi' => null,
         ]);
 
-        $pemaraf->notify(new SuratKeluarMenungguTindakan($surat_keluar, 'verifikasi'));
+        $this->beritahuSekretarisPengajuan($surat_keluar);
 
         ActivityHelper::log(
-            $diajukanUlang ? 'Ajukan Ulang Persetujuan' : 'Ajukan Persetujuan',
-            'Mengajukan surat ' . $surat_keluar->nomor_surat . ' untuk verifikasi ' . $pemaraf->label_jabatan
+            $diajukanUlang ? 'Ajukan Ulang Surat Keluar' : 'Ajukan Surat Keluar',
+            'Mengajukan konsep "' . $surat_keluar->perihal . '" untuk penomoran sekretaris'
         );
 
-        return redirect()->route('surat-keluar.index')->with('success', 'Surat diajukan untuk verifikasi ' . $pemaraf->label_jabatan . '.');
-    }
-
-    /**
-     * Verifikasi direktur terkait. Tahap ini memastikan surat sudah diperiksa
-     * pejabat bidangnya sebelum sampai ke meja Direktur Utama.
-     */
-    public function verifikasi(SuratKeluar $surat_keluar)
-    {
-        $user = auth()->user();
-
-        if (!$user->isDirektur()) {
-            abort(403, 'Akses ditolak. Hanya Direktur yang dapat memverifikasi surat keluar.');
-        }
-
-        if ($surat_keluar->status !== 'menunggu_direktur') {
-            return back()->with('error', 'Surat ini tidak sedang menunggu verifikasi.');
-        }
-
-        // Direktur hanya memverifikasi surat pada unitnya sendiri, mengikuti
-        // pembagian direktorat pada bagan organisasi.
-        if ($surat_keluar->unit_verifikasi !== $user->unit) {
-            abort(403, 'Akses ditolak. Surat ini bukan kewenangan direktorat Anda.');
-        }
-
-        $surat_keluar->update([
-            'status'               => 'menunggu_dirut',
-            'approved_direktur_by' => $user->id,
-            'approved_direktur_at' => now(),
-        ]);
-
-        $this->beritahuDirut($surat_keluar);
-        $this->beritahuSekretaris($surat_keluar, 'diverifikasi', $user->name);
-
-        ActivityHelper::log('Verifikasi Surat Keluar', $user->name . ' memverifikasi surat ' . $surat_keluar->nomor_surat);
-
-        return back()->with('success', 'Surat berhasil diverifikasi dan diteruskan ke Direktur Utama.');
+        return redirect()->route('surat-keluar.show', $surat_keluar->id)
+            ->with('success', 'Konsep diajukan ke sekretaris untuk penomoran.');
     }
 
     private function beritahuDirut(SuratKeluar $surat_keluar): void
     {
         foreach (\App\Models\User::where('role', 'dirut')->get() as $dirut) {
-            $dirut->notify(new SuratKeluarMenungguTindakan($surat_keluar, 'persetujuan'));
+            $dirut->notify(new SuratKeluarMenungguTindakan(
+                $surat_keluar,
+                'persetujuan',
+                auth()->user()?->name
+            ));
         }
     }
 
-    private function beritahuSekretaris(SuratKeluar $surat_keluar, string $keputusan, ?string $oleh = null): void
+    /**
+     * Konsep yang diajukan penyusun menunggu penomoran sekretaris. Ini giliran
+     * kerja, bukan keputusan - karena itu memakai SuratKeluarMenungguTindakan.
+     */
+    private function beritahuSekretarisPengajuan(SuratKeluar $surat_keluar): void
     {
-        foreach (\App\Models\User::where('role', 'sekretaris')->get() as $sekretaris) {
-            $sekretaris->notify(new SuratKeluarDiputuskan($surat_keluar, $keputusan, $oleh));
+        foreach ($this->paraSekretaris() as $sekretaris) {
+            // Sekretaris yang mengajukan konsepnya sendiri tidak perlu
+            // diberitahu atas tindakannya sendiri.
+            if ($sekretaris->id === auth()->id()) {
+                continue;
+            }
+
+            $sekretaris->notify(new SuratKeluarMenungguTindakan(
+                $surat_keluar,
+                'penomoran',
+                auth()->user()->name
+            ));
         }
+    }
+
+    /**
+     * Beritahu pihak yang perlu tahu atas keputusan terhadap surat keluar.
+     *
+     * Penyusun selalu termasuk - dialah yang harus memperbaiki bila surat
+     * dikembalikan, dan yang paling menunggu kabar bila surat terkirim.
+     * Sebelumnya hanya sekretaris yang diberitahu, sehingga penyusun harus
+     * membuka daftar sendiri untuk mengetahui suratnya ditolak.
+     *
+     * Sekretaris ikut diberitahu karena ia mengelola arsip persuratan, dan
+     * pengambil keputusan dilewati karena ia sendiri yang bertindak.
+     */
+    private function beritahuKeputusan(SuratKeluar $surat_keluar, string $keputusan, User $pengambilKeputusan): void
+    {
+        $penerima = collect([$surat_keluar->pembuat])
+            ->merge($this->paraSekretaris())
+            ->filter()
+            ->unique('id')
+            ->reject(fn (User $orang) => $orang->id === $pengambilKeputusan->id);
+
+        foreach ($penerima as $orang) {
+            $orang->notify(new SuratKeluarDiputuskan($surat_keluar, $keputusan, $pengambilKeputusan->name));
+        }
+    }
+
+    private function paraSekretaris()
+    {
+        return User::where('role', 'sekretaris')->get();
     }
 
     public function approve(SuratKeluar $surat_keluar)
@@ -281,7 +354,7 @@ class SuratKeluarController extends Controller
             
             // PROSES E-SIGN JIKA BERKAS ADALAH WORD (.docx)
             if ($surat_keluar->file) {
-                $fullPath = storage_path('app/public/' . $surat_keluar->file);
+                $fullPath = Storage::disk('public')->path($surat_keluar->file);
                 $ext = strtolower(pathinfo($fullPath, PATHINFO_EXTENSION));
                 
                 if ($ext === 'docx' && file_exists($fullPath)) {
@@ -339,7 +412,10 @@ class SuratKeluarController extends Controller
                                 'file' => $pdfRelativePath
                             ]);
                         }
-                    } catch (\Exception $e) {
+                    } catch (\Throwable $e) {
+                        // \Throwable, bukan \Exception: fungsi yang dimatikan
+                        // peladen melempar \Error, dan \Error tidak akan
+                        // tertangkap oleh catch (\Exception).
                         \Log::error('Gagal menyisipkan E-Sign ke berkas DOCX: ' . $e->getMessage());
                     }
                 }
@@ -351,7 +427,7 @@ class SuratKeluarController extends Controller
                 'approved_dirut_at' => now()
             ]);
 
-            $this->beritahuSekretaris($surat_keluar, 'disetujui', $user->name);
+            $this->beritahuKeputusan($surat_keluar, 'disetujui', $user);
 
             ActivityHelper::log('Approval Surat', 'Direktur Utama menyetujui surat ' . $surat_keluar->nomor_surat);
             return back()->with('success', 'Surat berhasil disetujui & E-Sign disematkan ke dalam dokumen.');
@@ -365,15 +441,15 @@ class SuratKeluarController extends Controller
         $user = auth()->user();
         $role = strtolower($user->role);
 
-        // Surat dapat dikembalikan di dua titik: saat menunggu verifikasi direktur
-        // bidangnya, dan saat menunggu persetujuan Direktur Utama.
+        // Surat dapat dikembalikan di dua titik: saat sekretaris memeriksa
+        // formatnya, dan saat menunggu tanda tangan Direktur Utama.
         if ($role === 'dirut') {
             $bolehMenolak = $surat_keluar->status === 'menunggu_dirut';
-        } elseif ($user->isDirektur()) {
-            $bolehMenolak = $surat_keluar->status === 'menunggu_direktur'
-                && $surat_keluar->unit_verifikasi === $user->unit;
+        } elseif ($role === 'sekretaris') {
+            // Format belum sesuai standar: dikembalikan ke penyusunnya.
+            $bolehMenolak = $surat_keluar->status === 'menunggu_sekretaris';
         } else {
-            abort(403, 'Hanya Direktur atau Direktur Utama yang dapat menolak Surat Keluar.');
+            abort(403, 'Hanya sekretaris atau Direktur Utama yang dapat mengembalikan Surat Keluar.');
         }
 
         if (!$bolehMenolak) {
@@ -389,7 +465,7 @@ class SuratKeluarController extends Controller
             'catatan_revisi' => $request->catatan_revisi
         ]);
 
-        $this->beritahuSekretaris($surat_keluar, 'ditolak', $user->name);
+        $this->beritahuKeputusan($surat_keluar, 'ditolak', $user);
 
         ActivityHelper::log('Reject Surat Keluar', 'Menolak Surat Keluar nomor ' . $surat_keluar->nomor_surat . ' dengan alasan: ' . $request->catatan_revisi);
 
@@ -398,11 +474,18 @@ class SuratKeluarController extends Controller
 
     public function download(SuratKeluar $surat_keluar)
     {
+        // Berkas dijaga dengan aturan yang sama seperti halaman detailnya.
+        // Tanpa ini, siapa pun yang punya izin surat keluar dapat mengunduh
+        // draf milik orang lain hanya dengan menebak nomor id.
+        if (!$surat_keluar->dapatDilihatOleh(auth()->user())) {
+            abort(403, 'Akses ditolak. Surat ini bukan kewenangan Anda.');
+        }
+
         if (!$surat_keluar->file) {
             abort(404, 'Berkas tidak ditemukan.');
         }
 
-        $filePath = storage_path('app/public/' . $surat_keluar->file);
+        $filePath = Storage::disk('public')->path($surat_keluar->file);
         
         if (!file_exists($filePath)) {
             abort(404, 'Berkas fisik tidak ditemukan di server.');
@@ -440,14 +523,14 @@ class SuratKeluarController extends Controller
 
     public function show(SuratKeluar $surat_keluar)
     {
-        $role = strtolower(auth()->user()->role);
-        
-        // Cek jika surat masih draft, hanya sekretaris dan admin yang bisa melihat
-        if ($surat_keluar->status === 'draft' && !in_array($role, ['admin', 'administrator', 'superadmin', 'sekretaris'])) {
-            abort(403, 'Akses ditolak. Surat masih dalam bentuk draft.');
+        // Aturan yang sama persis dengan filter daftar, supaya tidak ada surat
+        // yang tampil di daftar tapi ditolak saat dibuka. Draf tetap tertutup
+        // bagi orang lain, tetapi penyusunnya sendiri jelas boleh melihatnya.
+        if (!$surat_keluar->dapatDilihatOleh(auth()->user())) {
+            abort(403, 'Akses ditolak. Surat ini bukan kewenangan Anda.');
         }
 
-        $surat_keluar->load(['approvedDirektur', 'approvedDirut']);
+        $surat_keluar->load(['pembuat', 'approvedDirektur', 'approvedDirut']);
         return view('surat_keluar.show', compact('surat_keluar'));
     }
 
@@ -474,9 +557,23 @@ class SuratKeluarController extends Controller
         return view('surat_keluar.verify', compact('surat_keluar'));
     }
 
+    /**
+     * Konversi dokumen Word ke PDF, bila peladen menyediakan LibreOffice.
+     *
+     * Bersifat usaha terbaik: pada layanan shared hosting, shell_exec umumnya
+     * dimatikan lewat disable_functions dan LibreOffice tidak terpasang.
+     * Kegagalan di sini tidak boleh menghentikan alur persuratan, karena
+     * dokumen Word-nya sendiri sudah tersimpan dan tetap dapat diunduh.
+     */
     private function convertDocxToPdf($docxRelativePath)
     {
-        $fullPath = storage_path('app/public/' . $docxRelativePath);
+        // Memanggil fungsi yang dimatikan peladen berakibat fatal pada PHP 8,
+        // dan tanda @ tidak meredamnya. Karena itu diperiksa lebih dahulu.
+        if (!function_exists('shell_exec')) {
+            return false;
+        }
+
+        $fullPath = Storage::disk('public')->path($docxRelativePath);
         if (!file_exists($fullPath)) {
             return false;
         }
@@ -517,7 +614,7 @@ class SuratKeluarController extends Controller
             $templateProcessor->setValue('no_surat', $nomorSurat);
             $templateProcessor->saveAs($fullPath);
             return true;
-        } catch (\Exception $e) {
+        } catch (\Throwable $e) {
             return false;
         }
     }

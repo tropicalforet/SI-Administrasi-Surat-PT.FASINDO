@@ -1,16 +1,7 @@
-<!DOCTYPE html>
-<html lang="id">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Tindak Lanjut Disposisi - E-Office</title>
-    <script src="https://cdn.tailwindcss.com"></script>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
-    <style>
-        body { font-family: 'Inter', sans-serif; }
-    </style>
-</head>
-<body class="bg-slate-50 text-slate-800 p-4 sm:p-6 lg:p-8">
+﻿@extends('layouts.app')
+
+@section('content')
+<div class="p-4 sm:p-6 lg:p-8">
 
 <div class="max-w-7xl mx-auto">
 
@@ -82,21 +73,17 @@
                             <div class="flex flex-col sm:flex-row sm:items-start gap-1 sm:gap-4">
                                 <span class="font-semibold text-slate-600 sm:w-1/3">Dari Disposisi</span>
                                 <span class="text-slate-800 sm:w-2/3 flex items-center gap-2">
-                                    <span class="w-6 h-6 rounded-full bg-blue-100 text-blue-600 flex items-center justify-center text-xs font-bold">{{ substr($disposisi->dariUser->name, 0, 1) }}</span>
-                                    {{ $disposisi->dariUser->name }}
+                                    <span class="w-6 h-6 rounded-full bg-blue-100 text-blue-600 flex items-center justify-center text-xs font-bold">{{ substr($disposisi->label_pengirim, 0, 1) }}</span>
+                                    {{ $disposisi->label_pengirim }}
                                 </span>
                             </div>
 
                             <div class="flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-4">
                                 <span class="font-semibold text-slate-600 sm:w-1/3">Status Saat Ini</span>
                                 <div class="sm:w-2/3">
-                                    @if($disposisi->status == 'menunggu')
-                                        <span class="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold bg-yellow-50 text-yellow-700 border border-yellow-200">Menunggu</span>
-                                    @elseif($disposisi->status == 'diproses')
-                                        <span class="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold bg-blue-50 text-blue-700 border border-blue-200">Diproses</span>
-                                    @else
-                                        <span class="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200">Selesai</span>
-                                    @endif
+                                    <span class="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold border {{ $disposisi->warna_status }}">
+                                        {{ $disposisi->label_status }}
+                                    </span>
                                 </div>
                             </div>
 
@@ -172,7 +159,53 @@
 
             <hr class="my-10 border-slate-100">
 
+            @php
+                $bolehMengerjakan = $disposisi->bolehDitindaklanjutiOleh(auth()->user());
+            @endphp
+
+            {{-- Catatan dari pemberi disposisi saat pekerjaannya dikembalikan.
+                 Tanpa ini penerima hanya melihat statusnya mundur, tanpa tahu
+                 apa yang perlu diperbaiki. --}}
+            @if($disposisi->catatan_verifikasi && $bolehMengerjakan)
+                <div class="mb-8 rounded-xl border border-amber-200 bg-amber-50 p-5">
+                    <p class="text-sm font-bold text-amber-800">
+                        Dikembalikan oleh {{ $disposisi->label_pengirim }}
+                    </p>
+                    <p class="mt-1.5 text-sm text-amber-900 leading-relaxed">
+                        {{ $disposisi->catatan_verifikasi }}
+                    </p>
+                </div>
+            @endif
+
+            @unless($bolehMengerjakan)
+                <div class="mb-8 rounded-xl border border-slate-200 bg-slate-50 p-5">
+                    <p class="text-sm font-bold text-slate-700">
+                        @if($disposisi->menungguVerifikasi())
+                            Menunggu verifikasi {{ $disposisi->label_pengirim }}
+                        @elseif($disposisi->sudahSelesai())
+                            Disposisi ini sudah selesai
+                        @else
+                            Disposisi ini bukan tugas Anda
+                        @endif
+                    </p>
+                    <p class="mt-1.5 text-sm text-slate-600 leading-relaxed">
+                        @if($disposisi->menungguVerifikasi())
+                            Anda sudah menyatakan pekerjaan ini rampung. Selama diperiksa,
+                            isinya tidak dapat diubah. Bila ada yang perlu diperbaiki,
+                            {{ $disposisi->label_pengirim }} akan mengembalikannya beserta catatan.
+                        @elseif($disposisi->sudahSelesai())
+                            Tindak lanjutnya telah diverifikasi
+                            {{ $disposisi->label_pengirim }} dan dinyatakan selesai,
+                            sehingga tidak lagi dapat diubah.
+                        @else
+                            Yang berhak mengisi tindak lanjut hanya penerima disposisinya.
+                        @endif
+                    </p>
+                </div>
+            @endunless
+
             <!-- Form Update Status & Tindak Lanjut -->
+            @if($bolehMengerjakan)
             <form action="{{ route('disposisi.update', $disposisi->id) }}" method="POST" enctype="multipart/form-data">
                 @csrf
                 @method('PUT')
@@ -181,7 +214,7 @@
                     
                     <div>
                         <label class="block text-sm font-semibold text-slate-700 mb-2">
-                            Instruksi Disposisi <span class="text-slate-400 font-normal">(Dari {{ $disposisi->dariUser->name }})</span>
+                            Instruksi Disposisi <span class="text-slate-400 font-normal">(Dari {{ $disposisi->label_pengirim }})</span>
                         </label>
                         <textarea readonly
                                   rows="8"
@@ -197,11 +230,19 @@
                                     class="w-full px-4 py-3 bg-white border border-slate-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all text-slate-800 cursor-pointer shadow-sm @error('status') border-red-500 focus:ring-red-500 @enderror">
                                 <option value="menunggu" {{ old('status', $disposisi->status) == 'menunggu' ? 'selected' : '' }}>Menunggu</option>
                                 <option value="diproses" {{ old('status', $disposisi->status) == 'diproses' ? 'selected' : '' }}>Diproses</option>
-                                <option value="selesai" {{ old('status', $disposisi->status) == 'selesai' ? 'selected' : '' }}>Selesai</option>
+                                {{-- Penerima tidak menutup sendiri disposisinya.
+                                     Ia menyatakan pekerjaannya rampung, lalu
+                                     pemberi disposisi yang memutuskan. --}}
+                                <option value="menunggu_verifikasi" {{ old('status', $disposisi->status) == 'menunggu_verifikasi' ? 'selected' : '' }}>
+                                    Selesai &mdash; kirim untuk diverifikasi
+                                </option>
                             </select>
                             @error('status')
                                 <p class="text-red-500 text-xs mt-1.5">{{ $message }}</p>
                             @enderror
+                            <p class="text-xs text-slate-500 mt-1.5">
+                                Disposisi baru berstatus Selesai setelah {{ $disposisi->label_pengirim }} memverifikasi hasilnya.
+                            </p>
                         </div>
 
                         <div>
@@ -264,6 +305,7 @@
                     </button>
                 </div>
             </form>
+            @endif
         </div>
     </div>
 
@@ -291,9 +333,9 @@
                         <div class="flex flex-col sm:flex-row sm:justify-between sm:items-start gap-4 mb-4">
                             <div>
                                 <h3 class="font-bold text-slate-800 text-base flex items-center gap-2 flex-wrap">
-                                    {{ $item->dariUser->name }}
+                                    {{ $item->label_pengirim }}
                                     <svg class="w-4 h-4 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 8l4 4m0 0l-4 4m4-4H3"></path></svg>
-                                    {{ $item->kepadaUser->name }}
+                                    {{ $item->label_penerima }}
                                 </h3>
                                 <p class="text-xs text-slate-500 mt-1 flex items-center gap-1.5">
                                     <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"></path></svg>
@@ -341,5 +383,5 @@
 
 </div>
 
-</body>
-</html>
+</div>
+@endsection

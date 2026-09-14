@@ -23,6 +23,11 @@ function pegawai(string $role, ?string $unit = null, ?string $jabatan = null): U
     return $user;
 }
 
+/**
+ * Surat selalu punya tujuan. Sebelumnya fixture ini dibuat tanpa penerima
+ * sama sekali - keadaan yang tidak pernah ada pada data sebenarnya, karena
+ * sekretaris wajib menentukan tujuan saat mencatat surat masuk.
+ */
 function suratKomando(): SuratMasuk
 {
     return SuratMasuk::create([
@@ -34,6 +39,8 @@ function suratKomando(): SuratMasuk
         'jalur_penerimaan' => 'kurir',
         'perihal'          => 'Permohonan data',
         'status'           => 'baru',
+        'penerima'         => 'Direktur Teknik',
+        'penerima_role'    => 'direktur2',
     ]);
 }
 

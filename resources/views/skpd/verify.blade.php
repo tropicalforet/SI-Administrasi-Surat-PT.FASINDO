@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="id">
 <head>
     <meta charset="UTF-8">
@@ -55,7 +55,7 @@
                 <div class="grid grid-cols-1 md:grid-cols-2 gap-6 text-sm">
                     <div>
                         <span class="text-slate-400 block font-medium">Nomor SKPD</span>
-                        <span class="font-bold text-slate-800 mt-0.5 block">{{ $skpd->nomor_skpd ?? '-' }}</span>
+                        <span class="font-bold text-slate-800 mt-0.5 block">{{ $skpd->label_nomor }}</span>
                     </div>
                     <div>
                         <span class="text-slate-400 block font-medium">Pelaksana Dinas</span>

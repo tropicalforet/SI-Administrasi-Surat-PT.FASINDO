@@ -139,7 +139,7 @@ test('mengubah tujuan surat memberi notifikasi hanya kepada penerima baru', func
 
     $sekretaris = sekretarisPenerima();
     $direktur = User::factory()->create(['role' => 'direktur1']);
-    $staff = User::factory()->create(['role' => 'staff']);
+    $direkturBaru = User::factory()->create(['role' => 'direktur2']);
 
     $surat = SuratMasuk::create([
         'nomor_surat'   => '001/ABC/2026',
@@ -154,11 +154,103 @@ test('mengubah tujuan surat memberi notifikasi hanya kepada penerima baru', func
 
     $this->actingAs($sekretaris)->put('/surat-masuk/' . $surat->id, dataSurat([
         'penerima_tipe' => 'role',
-        'penerima_role' => 'staff',
+        'penerima_role' => 'direktur2',
     ]));
 
-    expect($surat->fresh()->penerima_role)->toBe('staff');
+    expect($surat->fresh()->penerima_role)->toBe('direktur2');
 
-    Notification::assertSentTo($staff, SuratMasukDiterima::class);
+    Notification::assertSentTo($direkturBaru, SuratMasukDiterima::class);
     Notification::assertNotSentTo($direktur, SuratMasukDiterima::class);
+});
+
+// ============================================================
+// Tujuan berbasis jabatan hanya untuk jabatan tunggal
+// ============================================================
+
+test('manager dan pelaksana tidak dapat dipilih sebagai jabatan tujuan', function () {
+    $sekretaris = sekretarisPenerima();
+
+    // Satu perusahaan punya beberapa manager dan pelaksana di unit berbeda,
+    // sehingga tujuan seperti ini selalu terbaca melebar ke unit lain.
+    foreach (['manager', 'staff'] as $jabatan) {
+        $this->actingAs($sekretaris)
+            ->post('/surat-masuk', dataSurat([
+                'penerima_tipe' => 'role',
+                'penerima_role' => $jabatan,
+            ]))
+            ->assertSessionHasErrors('penerima_role');
+    }
+
+    expect(SuratMasuk::count())->toBe(0);
+});
+
+test('formulir tidak lagi menawarkan manager sebagai jabatan tujuan', function () {
+    $sekretaris = sekretarisPenerima();
+
+    $this->actingAs($sekretaris)
+        ->get('/surat-masuk/create')
+        ->assertOk()
+        ->assertSee('Direktur Teknik')
+        ->assertDontSee('<option value="manager"', false)
+        ->assertDontSee('<option value="staff"', false);
+});
+
+test('surat lama bertujuan manager berhenti terbaca seluruh manager', function () {
+    $manager = User::factory()->create(['role' => 'manager', 'unit' => 'teknik']);
+    $managerLain = User::factory()->create(['role' => 'manager', 'unit' => 'keuangan_administrasi']);
+
+    // Data peninggalan aturan lama, sengaja tidak diubah agar tujuan asli
+    // surat tetap tercatat apa adanya.
+    $surat = SuratMasuk::create([
+        'nomor_surat'    => '099/LAMA/2026',
+        'kategori_surat' => 'Undangan',
+        'tanggal_surat'  => '2026-08-01',
+        'pengirim'       => 'Dinas Contoh',
+        'perihal'        => 'Surat era aturan lama',
+        'status'         => 'baru',
+        'penerima_role'  => 'manager',
+        'penerima'       => 'Manager',
+    ]);
+
+    foreach ([$manager, $managerLain] as $orang) {
+        expect($surat->bolehDibacaOleh($orang))->toBeFalse();
+
+        $this->actingAs($orang)
+            ->get('/surat-masuk')
+            ->assertOk()
+            ->assertDontSee('099/LAMA/2026');
+
+        $this->actingAs($orang)
+            ->get('/surat-masuk/' . $surat->id)
+            ->assertForbidden();
+    }
+});
+
+test('surat lama tetap terbaca sekretaris dan penerima disposisinya', function () {
+    $sekretaris = sekretarisPenerima();
+    $direktur = User::factory()->create(['role' => 'direktur1', 'unit' => 'keuangan_administrasi']);
+    $manager = User::factory()->create(['role' => 'manager', 'unit' => 'keuangan_administrasi']);
+
+    $surat = SuratMasuk::create([
+        'nomor_surat'    => '099/LAMA/2026',
+        'kategori_surat' => 'Undangan',
+        'tanggal_surat'  => '2026-08-01',
+        'pengirim'       => 'Dinas Contoh',
+        'perihal'        => 'Surat era aturan lama',
+        'status'         => 'baru',
+        'penerima_role'  => 'manager',
+        'penerima'       => 'Manager',
+    ]);
+
+    $surat->disposisis()->create([
+        'dari_user_id'      => $direktur->id,
+        'kepada_user_id'    => $manager->id,
+        'instruksi'         => 'Mohon ditindaklanjuti.',
+        'tanggal_disposisi' => '2026-08-02',
+        'status'            => 'belum',
+    ]);
+
+    // Yang benar-benar diberi tugas tetap dapat membacanya
+    expect($surat->bolehDibacaOleh($manager))->toBeTrue()
+        ->and($surat->bolehDibacaOleh($sekretaris))->toBeTrue();
 });

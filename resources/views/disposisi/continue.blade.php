@@ -1,18 +1,9 @@
-<!DOCTYPE html>
-<html lang="id">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Teruskan Disposisi - E-Office</title>
-    <script src="https://cdn.tailwindcss.com"></script>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
-    <style>
-        body { font-family: 'Inter', sans-serif; }
-    </style>
-</head>
-<body class="bg-slate-50 text-slate-800 flex justify-center py-10 px-4 sm:px-6">
+﻿@extends('layouts.app')
 
-    <div class="w-full max-w-3xl">
+@section('content')
+<div class="py-10 px-4 sm:px-6 flex justify-center">
+
+<div class="w-full max-w-3xl">
 
         <div class="mb-4">
             <a href="{{ route('disposisi.saya') }}"
@@ -87,8 +78,14 @@
                                     <input type="checkbox" name="kepada_user_id[]" value="{{ $user->id }}" 
                                            class="w-5 h-5 text-blue-600 rounded border-slate-300 focus:ring-blue-500"
                                            {{ is_array(old('kepada_user_id')) && in_array($user->id, old('kepada_user_id')) ? 'checked' : '' }}>
-                                    <span class="text-sm font-medium text-slate-800">
-                                        {{ $user->name }} <span class="text-xs text-slate-500 ml-1">({{ strtoupper($user->role) }})</span>
+                                    <span class="min-w-0">
+                                        <span class="block text-sm font-semibold text-slate-800">{{ $user->name }}</span>
+                                        <span class="block text-xs text-slate-500">
+                                            {{ $user->label_jabatan }}
+                                            @if($user->unit)
+                                                &middot; Unit {{ $user->label_unit }}
+                                            @endif
+                                        </span>
                                     </span>
                                 </label>
                             @endforeach
@@ -104,9 +101,9 @@
                             Batas Waktu Tindak Lanjut (Tenggat)
                         </label>
                         <input type="date" 
-                               name="batas_waktu" 
-                               value="{{ old('batas_waktu') }}"
-                               min="{{ date('Y-m-d') }}"
+                               name="batas_waktu"
+                               value="{{ old('batas_waktu', now()->toDateString()) }}"
+                               min="{{ now()->toDateString() }}"
                                class="w-full px-4 py-3 bg-white border border-slate-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all text-slate-800 cursor-pointer shadow-sm @error('batas_waktu') border-red-500 focus:ring-red-500 @enderror">
                         @error('batas_waktu')
                             <p class="text-red-500 text-xs mt-1.5">{{ $message }}</p>
@@ -205,5 +202,5 @@
         });
     </script>
 
-</body>
-</html>
+</div>
+@endsection

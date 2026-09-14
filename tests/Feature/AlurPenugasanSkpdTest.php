@@ -23,7 +23,6 @@ function orang(string $role, ?string $unit = null): User
 function dataPenugasan(array $tambahan = []): array
 {
     return array_merge([
-        'jenis'             => 'perjalanan_dinas',
         'keperluan'         => 'Kunjungan proyek',
         'tujuan_dinas'      => 'Surabaya',
         'tanggal_berangkat' => '2026-09-01',
@@ -44,12 +43,23 @@ test('staf punya pintu masuk untuk mengajukan dari daftar SKPD', function () {
 });
 
 test('atasan melihat ajakan membuat penugasan, bukan mengajukan', function () {
-    $direktur = orang('direktur2', 'teknik');
+    foreach ([orang('dirut', 'pimpinan'), orang('direktur2', 'teknik')] as $atasan) {
+        $this->actingAs($atasan)
+            ->get('/skpd')
+            ->assertOk()
+            ->assertSee('Buat Penugasan');
+    }
+});
 
-    $this->actingAs($direktur)
+test('sekretaris diajak mengajukan usulan, bukan menugaskan', function () {
+    // Sekretaris tidak punya bawahan di bagan organisasi
+    $sekretaris = orang('sekretaris', 'pimpinan');
+
+    $this->actingAs($sekretaris)
         ->get('/skpd')
         ->assertOk()
-        ->assertSee('Buat Penugasan');
+        ->assertSee('Ajukan Penugasan')
+        ->assertDontSee('Buat Penugasan');
 });
 
 test('form staf tidak menawarkan memilih pegawai lain', function () {
@@ -59,20 +69,59 @@ test('form staf tidak menawarkan memilih pegawai lain', function () {
     $this->actingAs($pegawai)
         ->get('/skpd/create')
         ->assertOk()
-        ->assertSee('Jenis Penugasan')
+        ->assertSee('Tujuan Perjalanan')
         ->assertDontSee('Pegawai yang Ditugaskan')
         ->assertDontSee('Orang Lain');
 });
 
-test('atasan dapat memilih pegawai yang ditugaskan', function () {
+test('dirut dapat memilih siapa pun dalam struktur', function () {
+    $dirut = orang('dirut', 'pimpinan');
+    User::factory()->create(['name' => 'Budi Teknik', 'role' => 'manager', 'unit' => 'teknik']);
+    User::factory()->create(['name' => 'Sari Keuangan', 'role' => 'staff', 'unit' => 'keuangan_administrasi']);
+
+    $this->actingAs($dirut)
+        ->get('/skpd/create')
+        ->assertOk()
+        ->assertSee('Pegawai yang Ditugaskan')
+        ->assertSee('Budi Teknik')
+        ->assertSee('Sari Keuangan');
+});
+
+test('administrator tidak muncul sebagai calon pegawai, di luar bagan', function () {
+    $dirut = orang('dirut', 'pimpinan');
+    User::factory()->create(['name' => 'Petugas Sistem', 'role' => 'administrator', 'unit' => null]);
+
+    $this->actingAs($dirut)
+        ->get('/skpd/create')
+        ->assertOk()
+        ->assertDontSee('Petugas Sistem');
+});
+
+test('direktur hanya ditawari bawahan direktoratnya sendiri', function () {
     $direktur = orang('direktur2', 'teknik');
-    User::factory()->create(['name' => 'Budi Teknik', 'role' => 'staff', 'unit' => 'teknik']);
+
+    User::factory()->create(['name' => 'Budi Teknik', 'role' => 'manager', 'unit' => 'teknik']);
+    User::factory()->create(['name' => 'Sari Keuangan', 'role' => 'staff', 'unit' => 'keuangan_administrasi']);
+    User::factory()->create(['name' => 'Dirut Perusahaan', 'role' => 'dirut', 'unit' => 'pimpinan']);
 
     $this->actingAs($direktur)
         ->get('/skpd/create')
         ->assertOk()
         ->assertSee('Pegawai yang Ditugaskan')
-        ->assertSee('Budi Teknik');
+        ->assertSee('Budi Teknik')
+        ->assertDontSee('Sari Keuangan')
+        ->assertDontSee('Dirut Perusahaan');
+});
+
+test('sekretaris tidak menugaskan siapa pun', function () {
+    $sekretaris = orang('sekretaris', 'pimpinan');
+    User::factory()->create(['name' => 'Budi Teknik', 'role' => 'manager', 'unit' => 'teknik']);
+
+    $this->actingAs($sekretaris)
+        ->get('/skpd/create')
+        ->assertOk()
+        ->assertDontSee('Pegawai yang Ditugaskan')
+        ->assertDontSee('Budi Teknik');
 });
 
 test('pemilik dapat melihat pratinjau dokumennya sendiri sejak draft', function () {
@@ -149,7 +198,7 @@ test('usulan pegawai ditandai sebagai usulan, bukan penugasan', function () {
 
 test('penugasan dari direktur ditandai sebagai penugasan', function () {
     $direktur = orang('direktur2', 'teknik');
-    $pegawai = orang('staff', 'teknik');
+    $pegawai = orang('manager', 'teknik');
 
     $this->actingAs($direktur)->post('/skpd', dataPenugasan([
         'user_id' => $pegawai->id,
@@ -190,9 +239,23 @@ test('usulan pegawai harus lewat direkturnya dulu, tidak langsung ke dirut', fun
     expect($skpd->fresh()->status)->toBe('menunggu_direktur');
 });
 
+test('penugasan langsung dari dirut tidak singgah ke direktur', function () {
+    $dirut = orang('dirut', 'pimpinan');
+    orang('direktur2', 'teknik');
+    $pegawai = orang('staff', 'teknik');
+
+    $this->actingAs($dirut)->post('/skpd', dataPenugasan([
+        'user_id' => $pegawai->id,
+        'aksi'    => 'ajukan',
+    ]));
+
+    // Dirut adalah keputusan terakhir, tidak meminta izin bawahannya
+    expect(Skpd::first()->status)->toBe('menunggu_dirut');
+});
+
 test('penugasan direktur atas bawahannya langsung menuju dirut', function () {
     $direktur = orang('direktur2', 'teknik');
-    $pegawai = orang('staff', 'teknik');
+    $pegawai = orang('manager', 'teknik');
     orang('dirut', 'pimpinan');
 
     $this->actingAs($direktur)->post('/skpd', dataPenugasan([
@@ -200,22 +263,136 @@ test('penugasan direktur atas bawahannya langsung menuju dirut', function () {
         'aksi'    => 'ajukan',
     ]));
 
-    // Direktur adalah atasan langsungnya, tidak perlu persetujuan siapa pun lagi
+    // Direktur sudah menyatakan setuju lewat penugasannya, tidak perlu
+    // menyetujui dokumen yang ia terbitkan sendiri.
     expect(Skpd::first()->status)->toBe('menunggu_dirut');
 });
 
-test('penugasan oleh sekretaris tetap perlu persetujuan direktur', function () {
-    $sekretaris = orang('sekretaris', 'pimpinan');
-    orang('direktur2', 'teknik');
-    $pegawai = orang('staff', 'teknik');
+// ============================================================
+// Batas kewenangan menugaskan
+// ============================================================
 
-    $this->actingAs($sekretaris)->post('/skpd', dataPenugasan([
-        'user_id' => $pegawai->id,
+test('direktur tidak dapat menugaskan pegawai direktorat lain', function () {
+    $direkturTeknik = orang('direktur2', 'teknik');
+    $orangKeuangan = orang('staff', 'keuangan_administrasi');
+
+    $this->actingAs($direkturTeknik)
+        ->post('/skpd', dataPenugasan([
+            'user_id' => $orangKeuangan->id,
+            'aksi'    => 'draft',
+        ]))
+        ->assertSessionHasErrors('user_id');
+
+    expect(Skpd::count())->toBe(0);
+});
+
+test('direktur tidak dapat menugaskan direktur lain maupun dirut', function () {
+    $direkturTeknik = orang('direktur2', 'teknik');
+    $direkturKeuangan = orang('direktur1', 'keuangan_administrasi');
+    $dirut = orang('dirut', 'pimpinan');
+
+    foreach ([$direkturKeuangan, $dirut] as $diLuarJangkauan) {
+        $this->actingAs($direkturTeknik)
+            ->post('/skpd', dataPenugasan([
+                'user_id' => $diLuarJangkauan->id,
+                'aksi'    => 'draft',
+            ]))
+            ->assertSessionHasErrors('user_id');
+    }
+
+    expect(Skpd::count())->toBe(0);
+});
+
+test('dirut dapat menugaskan siapa pun tanpa terkecuali', function () {
+    $dirut = orang('dirut', 'pimpinan');
+
+    $semua = [
+        orang('direktur1', 'keuangan_administrasi'),
+        orang('direktur2', 'teknik'),
+        orang('sekretaris', 'pimpinan'),
+        orang('manager', 'teknik'),
+        orang('staff', 'keuangan_administrasi'),
+    ];
+
+    foreach ($semua as $pegawai) {
+        $this->actingAs($dirut)
+            ->post('/skpd', dataPenugasan([
+                'user_id' => $pegawai->id,
+                'aksi'    => 'draft',
+            ]))
+            ->assertSessionHasNoErrors();
+    }
+
+    expect(Skpd::count())->toBe(count($semua));
+});
+
+test('direktur mengusulkan penugasan untuk dirinya sendiri, langsung ke dirut', function () {
+    $direktur = orang('direktur2', 'teknik');
+    orang('dirut', 'pimpinan');
+
+    $this->actingAs($direktur)->post('/skpd', dataPenugasan([
+        'user_id' => $direktur->id,
         'aksi'    => 'ajukan',
     ]));
 
-    // Sekretaris tidak punya wewenang lini atas pegawai teknik
-    expect(Skpd::first()->status)->toBe('menunggu_direktur');
+    $skpd = Skpd::first();
+
+    // Dokumen atas nama diri sendiri tetap usulan, dan tidak singgah ke
+    // tahap direktur - ia akan menyetujui usulannya sendiri.
+    expect($skpd->user_id)->toBe($direktur->id)
+        ->and($skpd->asal_usul)->toBe('usulan')
+        ->and($skpd->ditugaskan_oleh)->toBeNull()
+        ->and($skpd->status)->toBe('menunggu_dirut');
+});
+
+test('usulan sekretaris juga langsung ke dirut karena tak berdirektur', function () {
+    $sekretaris = orang('sekretaris', 'pimpinan');
+    orang('direktur2', 'teknik');
+    orang('dirut', 'pimpinan');
+
+    // Sekretaris berada di unit pimpinan, tidak ada direktur di atasnya.
+    // Sebelumnya pengajuan ini mentok dengan pesan "direktur belum ada".
+    $this->actingAs($sekretaris)->post('/skpd', dataPenugasan([
+        'user_id' => $sekretaris->id,
+        'aksi'    => 'ajukan',
+    ]));
+
+    expect(Skpd::first()->status)->toBe('menunggu_dirut');
+});
+
+test('sekretaris hanya dapat mengajukan untuk dirinya sendiri', function () {
+    $sekretaris = orang('sekretaris', 'pimpinan');
+    $pegawai = orang('staff', 'teknik');
+
+    // Pegawai yang dikirim di request diabaikan, bukan ditolak, agar
+    // dokumennya tetap terbentuk sebagai usulan atas namanya sendiri.
+    $this->actingAs($sekretaris)->post('/skpd', dataPenugasan([
+        'user_id' => $pegawai->id,
+        'aksi'    => 'draft',
+    ]));
+
+    $skpd = Skpd::first();
+
+    expect($skpd->user_id)->toBe($sekretaris->id)
+        ->and($skpd->asal_usul)->toBe('usulan')
+        ->and($skpd->ditugaskan_oleh)->toBeNull();
+});
+
+test('direktur tetap menjadi penyetuju usulan bawahannya', function () {
+    $direktur = orang('direktur2', 'teknik');
+    $pegawai = orang('staff', 'teknik');
+    orang('dirut', 'pimpinan');
+
+    // Satu-satunya jalur penugasan bawahan kini: pegawai mengusulkan,
+    // direktur menilai, dirut memutuskan.
+    $this->actingAs($pegawai)->post('/skpd', dataPenugasan(['aksi' => 'ajukan']));
+    $skpd = Skpd::first();
+
+    expect($skpd->status)->toBe('menunggu_direktur');
+
+    $this->actingAs($direktur)->put('/skpd/' . $skpd->id . '/setujui-direktur');
+
+    expect($skpd->fresh()->status)->toBe('menunggu_dirut');
 });
 
 test('direktur menyetujui usulan lalu naik ke dirut', function () {
@@ -308,26 +485,20 @@ test('direktur dapat menolak usulan dengan catatan', function () {
         ->and($skpd->catatan_revisi)->toBe('Kunjungan dapat diwakilkan lewat daring.');
 });
 
-test('tugas internal tidak memerlukan tujuan perjalanan', function () {
+test('formulir tidak lagi menawarkan jenis penugasan', function () {
     $pegawai = orang('staff', 'teknik');
 
-    $this->actingAs($pegawai)->post('/skpd', [
-        'jenis'             => 'internal',
-        'keperluan'         => 'Panitia HUT perusahaan',
-        'tanggal_berangkat' => '2026-09-01',
-        'tanggal_kembali'   => '2026-09-02',
-        'aksi'              => 'draft',
-    ]);
-
-    $skpd = Skpd::first();
-
-    expect($skpd)->not->toBeNull()
-        ->and($skpd->jenis)->toBe('internal')
-        ->and($skpd->tujuan_dinas)->toBeNull()
-        ->and($skpd->berupaPerjalanan())->toBeFalse();
+    // SKPD kembali menjadi satu macam dokumen saja
+    $this->actingAs($pegawai)
+        ->get('/skpd/create')
+        ->assertOk()
+        ->assertSee('Tujuan Perjalanan')
+        ->assertSee('Tanggal Berangkat')
+        ->assertDontSee('Jenis Penugasan')
+        ->assertDontSee('Tugas Internal');
 });
 
-test('perjalanan dinas tetap mewajibkan tujuan', function () {
+test('setiap skpd wajib menyebut tujuan perjalanan', function () {
     $pegawai = orang('staff', 'teknik');
 
     $this->actingAs($pegawai)
