@@ -1,59 +1,105 @@
-<p align="center"><a href="https://laravel.com" target="_blank"><img src="https://raw.githubusercontent.com/laravel/art/master/logo-lockup/5%20SVG/2%20CMYK/1%20Full%20Color/laravel-logolockup-cmyk-red.svg" width="400" alt="Laravel Logo"></a></p>
+# E-Office: Sistem Administrasi Surat & Disposisi — PT Fasadetama Indonesia
 
-<p align="center">
-<a href="https://github.com/laravel/framework/actions"><img src="https://github.com/laravel/framework/workflows/tests/badge.svg" alt="Build Status"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/dt/laravel/framework" alt="Total Downloads"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/v/laravel/framework" alt="Latest Stable Version"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/l/laravel/framework" alt="License"></a>
-</p>
+Sistem informasi berbasis web untuk mengelola surat masuk, surat keluar, dan alur disposisi berjenjang di PT Fasadetama Indonesia. Dibangun sebagai proyek skripsi S1 Sistem Informasi UNIKOM.
 
-## About Laravel
+## Fitur
 
-Laravel is a web application framework with expressive, elegant syntax. We believe development must be an enjoyable and creative experience to be truly fulfilling. Laravel takes the pain out of development by easing common tasks used in many web projects, such as:
+- Surat masuk dan surat keluar, dengan penomoran surat otomatis
+- Disposisi berjenjang dan monitoring disposisi
+- SKPD (surat perjalanan dinas)
+- Tanda tangan elektronik dengan verifikasi QR code
+- Hak akses per peran dan per menu
+- Laporan surat masuk, surat keluar, dan SKPD
+- Activity log dan dashboard
 
-- [Simple, fast routing engine](https://laravel.com/docs/routing).
-- [Powerful dependency injection container](https://laravel.com/docs/container).
-- Multiple back-ends for [session](https://laravel.com/docs/session) and [cache](https://laravel.com/docs/cache) storage.
-- Expressive, intuitive [database ORM](https://laravel.com/docs/eloquent).
-- Database agnostic [schema migrations](https://laravel.com/docs/migrations).
-- [Robust background job processing](https://laravel.com/docs/queues).
-- [Real-time event broadcasting](https://laravel.com/docs/broadcasting).
+Pengujian: Black Box Testing pada 8 modul.
 
-Laravel is accessible, powerful, and provides tools required for large, robust applications.
+## Teknologi
 
-## Learning Laravel
+Laravel 12 · PHP 8.2 · MySQL/MariaDB · Tailwind CSS · Alpine.js · DomPDF · PHPWord
 
-Laravel has the most extensive and thorough [documentation](https://laravel.com/docs) and video tutorial library of all modern web application frameworks, making it a breeze to get started with the framework. You can also check out [Laravel Learn](https://laravel.com/learn), where you will be guided through building a modern Laravel application.
+## Cara menjalankan
 
-If you don't feel like reading, [Laracasts](https://laracasts.com) can help. Laracasts contains thousands of video tutorials on a range of topics including Laravel, modern PHP, unit testing, and JavaScript. Boost your skills by digging into our comprehensive video library.
+Kebutuhan: PHP 8.2+, Composer, Node.js 20+, dan MySQL/MariaDB (misalnya lewat Laragon atau XAMPP).
 
-## Laravel Sponsors
+1. Clone repo:
+   ```bash
+   git clone https://github.com/tropicalforet/SI-Administrasi-Surat-PT.FASINDO.git
+   cd SI-Administrasi-Surat-PT.FASINDO
+   ```
+2. Buat database kosong di MySQL, misalnya `e_office`.
+3. Salin `.env.example` menjadi `.env`, lalu sesuaikan koneksi database:
+   ```env
+   DB_DATABASE=e_office
+   DB_USERNAME=root
+   DB_PASSWORD=
+   ```
+4. Install dan siapkan aplikasi:
+   ```bash
+   composer run setup
+   php artisan db:seed
+   php artisan storage:link
+   ```
+5. Jalankan:
+   ```bash
+   composer run dev
+   ```
+   Buka `http://localhost:8000`.
 
-We would like to extend our thanks to the following sponsors for funding Laravel development. If you are interested in becoming a sponsor, please visit the [Laravel Partners program](https://partners.laravel.com).
+## Akun awal
 
-### Premium Partners
+Seeder membuat satu akun:
 
-- **[Vehikl](https://vehikl.com)**
-- **[Tighten Co.](https://tighten.co)**
-- **[Kirschbaum Development Group](https://kirschbaumdevelopment.com)**
-- **[64 Robots](https://64robots.com)**
-- **[Curotec](https://www.curotec.com/services/technologies/laravel)**
-- **[DevSquad](https://devsquad.com/hire-laravel-developers)**
-- **[Redberry](https://redberry.international/laravel-development)**
-- **[Active Logic](https://activelogic.com)**
+| Email | Password |
+|---|---|
+| `test@example.com` | `password` |
 
-## Contributing
+Akun ini berperan `staff`. Jadikan administrator agar bisa membuat akun lain:
 
-Thank you for considering contributing to the Laravel framework! The contribution guide can be found in the [Laravel documentation](https://laravel.com/docs/contributions).
+```bash
+php artisan tinker --execute="App\Models\User::where('email','test@example.com')->update(['role'=>'superadmin']);"
+```
 
-## Code of Conduct
+## Peran pengguna
 
-In order to ensure that the Laravel community is welcoming to all, please review and abide by the [Code of Conduct](https://laravel.com/docs/contributions#code-of-conduct).
+| Peran | Tugas utama |
+|---|---|
+| `superadmin` / `admin` | Mengelola akun pengguna, hak akses menu, arsip terhapus, activity log |
+| `sekretaris` | Mencatat surat masuk, memeriksa surat keluar sebelum ke Direktur Utama |
+| `dirut` (Direktur Utama) | Mendisposisikan surat masuk, menyetujui/menolak surat keluar dan SKPD |
+| `direktur1` / `direktur2` | Direktur Keuangan & Administrasi / Direktur Teknik: meneruskan disposisi, menyetujui SKPD unitnya |
+| `manager` | Meneruskan disposisi ke staf |
+| `staff` | Menindaklanjuti disposisi, membuat draft surat keluar dan SKPD |
 
-## Security Vulnerabilities
+## Cara menggunakan
 
-If you discover a security vulnerability within Laravel, please send an e-mail to Taylor Otwell via [taylor@laravel.com](mailto:taylor@laravel.com). All security vulnerabilities will be promptly addressed.
+### 1. Siapkan akun (admin)
 
-## License
+Login sebagai admin, buka menu **Manajemen User**, lalu buat akun untuk setiap peran (sekretaris, dirut, direktur, manager, staf). Peran direktur, manager, dan staf wajib diisi unitnya.
 
-The Laravel framework is open-sourced software licensed under the [MIT license](https://opensource.org/licenses/MIT).
+### 2. Surat masuk dan disposisi
+
+1. **Sekretaris** membuka **Surat Masuk → Tambah**, mengisi data surat, mengunggah file, dan memilih penerima (orang atau peran).
+2. **Direktur Utama** membuka surat tersebut lalu membuat **disposisi** ke direktur atau sekretaris, beserta instruksinya.
+3. Penerima melihat tugasnya di **Disposisi Saya**, lalu memperbarui status atau klik **Teruskan Disposisi** ke bawahannya (direktur → manager → staf).
+4. Setelah selesai dikerjakan, pemberi disposisi klik **Verifikasi**, atau **Kembalikan untuk Diperbaiki** jika belum sesuai.
+5. Seluruh alur dapat dipantau di **Monitoring Disposisi**. Setiap perubahan memunculkan notifikasi.
+
+### 3. Surat keluar
+
+1. Pembuat surat membuka **Surat Keluar → Tambah**, mengisi isi surat (tersimpan sebagai **draft**), lalu klik **Ajukan**.
+2. **Sekretaris** memeriksa dan memproses surat. Nomor surat terbit otomatis, lalu surat diteruskan ke Direktur Utama.
+3. **Direktur Utama** menyetujui (surat diberi tanda tangan elektronik dan QR code; status **terkirim**) atau menolak dengan catatan.
+4. Surat yang disetujui dapat diunduh sebagai PDF. Scan QR code pada surat untuk membuka halaman verifikasi keaslian.
+
+### 4. SKPD (Surat Perjalanan Dinas)
+
+1. Pegawai membuat SKPD (**draft**), lalu klik **Ajukan** ke direktur unitnya.
+2. Direktur menyetujui, lalu SKPD diteruskan ke **Direktur Utama** untuk persetujuan akhir.
+3. SKPD yang disetujui dapat dipratinjau dan diunduh sebagai PDF ber-QR code.
+
+### 5. Laporan dan arsip
+
+- **Laporan**: pilih jenis (surat masuk, surat keluar, disposisi, SKPD), atur filter, lalu ekspor ke PDF.
+- **Arsip Terhapus** (admin): pulihkan atau hapus permanen data yang terhapus.
+- **Activity Log** (admin): riwayat aktivitas seluruh pengguna.
